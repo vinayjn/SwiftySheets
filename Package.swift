@@ -1,21 +1,30 @@
-// swift-tools-version: 6.0
-// The swift-tools-version declares the minimum version of Swift required to build this package.
-
+// swift-tools-version:6.0
 import PackageDescription
 
 let package = Package(
     name: "SwiftySheets",
+    platforms: [
+        .macOS(.v12),
+        .iOS(.v15)
+    ],
+    products: [
+        .library(
+            name: "SwiftySheets",
+            targets: ["SwiftySheets"]),
+    ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
+        .package(url: "https://github.com/googleapis/google-auth-library-swift.git", from: "0.5.0"),
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
-        .executableTarget(
+        .target(
             name: "SwiftySheets",
             dependencies: [
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "OAuth2", package: "google-auth-library-swift")
             ]
         ),
+        .testTarget(
+          name: "SwiftySheetsTests",
+          dependencies: ["SwiftySheets"]
+        )
     ]
 )
