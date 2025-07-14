@@ -25,15 +25,50 @@ public final class Client {
         let authenticatedRequest = try await credentials.authenticate(request)
         let (data, response) = try await session.data(for: authenticatedRequest, delegate: nil)
 
-        guard
-            let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
-            throw SheetsError.invalidResponse(
-                status: (response as? HTTPURLResponse)?.statusCode ?? 500
-            )
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SheetsError.invalidResponse(status: 500)
         }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            try handleErrorResponse(data: data, statusCode: httpResponse.statusCode, headers: httpResponse.allHeaderFields)
+        }
+        
         return try JSONDecoder().decode(T.self, from: data)
+    }
+    
+    private func handleErrorResponse(data: Data, statusCode: Int, headers: [AnyHashable: Any]) throws -> Never {
+        let retryAfter = extractRetryAfter(from: headers)
+        
+        switch statusCode {
+        case 401:
+            throw SheetsError.authenticationFailed
+        case 403:
+            if let apiError = try? JSONDecoder().decode(GoogleAPIError.self, from: data) {
+                if apiError.error.status == "PERMISSION_DENIED" {
+                    throw SheetsError.permissionDenied(message: apiError.error.message)
+                } else if apiError.error.message.contains("quota") {
+                    throw SheetsError.quotaExceeded(retryAfter: retryAfter)
+                }
+                throw SheetsError.apiError(apiError)
+            }
+            throw SheetsError.permissionDenied(message: "Access denied")
+        case 404:
+            throw SheetsError.spreadsheetNotFound(message: "Resource not found")
+        case 429:
+            throw SheetsError.rateLimitExceeded(retryAfter: retryAfter)
+        default:
+            if let apiError = try? JSONDecoder().decode(GoogleAPIError.self, from: data) {
+                throw SheetsError.apiError(apiError)
+            }
+            throw SheetsError.invalidResponse(status: statusCode)
+        }
+    }
+    
+    private func extractRetryAfter(from headers: [AnyHashable: Any]) -> TimeInterval? {
+        if let retryAfterStr = headers["Retry-After"] as? String {
+            return TimeInterval(retryAfterStr)
+        }
+        return nil
     }
 }
 
@@ -41,4 +76,51 @@ public extension Client {
     func spreadsheet(id: String) async throws -> Spreadsheet {
         try await Spreadsheet(client: self, id: id)
     }
+    
+    func updateValues(
+        spreadsheetId: String,
+        range: String,
+        values: [[String]],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        let requestBody = UpdateValuesRequest(range: range, values: values)
+        let bodyData = try JSONEncoder().encode(requestBody)
+        let request = try Endpoint.updateValues(
+            spreadsheetId: spreadsheetId,
+            range: range,
+            valueInputOption: valueInputOption.rawValue
+        ).request(with: bodyData)
+        
+        return try await makeRequest(request)
+    }
+    
+    func appendValues(
+        spreadsheetId: String,
+        range: String,
+        values: [[String]],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        let requestBody = UpdateValuesRequest(range: range, values: values)
+        let bodyData = try JSONEncoder().encode(requestBody)
+        let request = try Endpoint.appendValues(
+            spreadsheetId: spreadsheetId,
+            range: range,
+            valueInputOption: valueInputOption.rawValue
+        ).request(with: bodyData)
+        
+        return try await makeRequest(request)
+    }
+    
+    func batchUpdate(
+        spreadsheetId: String,
+        requests: [BatchUpdateRequest.Request]
+    ) async throws {
+        let requestBody = BatchUpdateRequest(requests: requests)
+        let bodyData = try JSONEncoder().encode(requestBody)
+        let request = try Endpoint.batchUpdate(spreadsheetId: spreadsheetId).request(with: bodyData)
+        
+        let _: EmptyResponse = try await makeRequest(request)
+    }
 }
+
+private struct EmptyResponse: Decodable {}
