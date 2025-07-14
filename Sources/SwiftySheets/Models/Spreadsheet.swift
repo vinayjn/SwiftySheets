@@ -65,4 +65,50 @@ public extension Spreadsheet {
         }
         return sheet
     }
+    
+    func updateValues(
+        range: String,
+        values: [[String]],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        try await client.updateValues(
+            spreadsheetId: id,
+            range: range,
+            values: values,
+            valueInputOption: valueInputOption
+        )
+    }
+    
+    func appendValues(
+        range: String,
+        values: [[String]],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        try await client.appendValues(
+            spreadsheetId: id,
+            range: range,
+            values: values,
+            valueInputOption: valueInputOption
+        )
+    }
+    
+    func batchUpdate(requests: [BatchUpdateRequest.Request]) async throws {
+        try await client.batchUpdate(spreadsheetId: id, requests: requests)
+    }
+    
+    func addSheet(title: String, rowCount: Int = 1000, columnCount: Int = 26) async throws {
+        let properties = Sheet.SheetProperties(
+            sheetId: 0,
+            title: title,
+            index: 0,
+            gridProperties: Sheet.GridProperties(rowCount: rowCount, columnCount: columnCount)
+        )
+        let request = BatchUpdateRequest.Request.addSheet(AddSheetRequest(properties: properties))
+        try await batchUpdate(requests: [request])
+    }
+    
+    func deleteSheet(sheetId: Int) async throws {
+        let request = BatchUpdateRequest.Request.deleteSheet(DeleteSheetRequest(sheetId: sheetId))
+        try await batchUpdate(requests: [request])
+    }
 }
