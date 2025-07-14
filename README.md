@@ -161,8 +161,4 @@ let client = Client(
 
 ## License
 
-[Add your license here]
-
-## Contributing
-
-[Add contribution guidelines here]
+MIT License - see [LICENSE](LICENSE) file for details.
