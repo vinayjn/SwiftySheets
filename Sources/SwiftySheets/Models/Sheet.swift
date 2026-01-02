@@ -119,6 +119,14 @@ public struct Sheet: Codable, Sendable {
     }
 }
 
+public extension Sheet {
+    var title: String { properties.title }
+    var sheetId: Int { properties.sheetId }
+    var index: Int { properties.index }
+    var rowCount: Int { properties.gridProperties.rowCount }
+    var columnCount: Int { properties.gridProperties.columnCount }
+}
+
 // For Drive API responses
 public struct DriveSearchResponse: Decodable {
     public let files: [DriveFile]
@@ -170,6 +178,7 @@ public struct BatchUpdateRequest: Encodable {
         case deleteSheet(DeleteSheetRequest)
         case repeatCell(RepeatCellRequest)
         case sortRange(SortRangeRequest)
+        case updateSheetProperties(UpdateSheetPropertiesRequest)
         
         enum CodingKeys: String, CodingKey {
             case updateCells
@@ -177,6 +186,7 @@ public struct BatchUpdateRequest: Encodable {
             case deleteSheet
             case repeatCell
             case sortRange
+            case updateSheetProperties
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -192,6 +202,8 @@ public struct BatchUpdateRequest: Encodable {
                 try container.encode(request, forKey: .repeatCell)
             case .sortRange(let request):
                 try container.encode(request, forKey: .sortRange)
+            case .updateSheetProperties(let request):
+                try container.encode(request, forKey: .updateSheetProperties)
             }
         }
     }
@@ -341,5 +353,15 @@ public struct ExtendedValue: Codable {
         self.stringValue = stringValue
         self.numberValue = numberValue
         self.boolValue = boolValue
+    }
+}
+
+public struct UpdateSheetPropertiesRequest: Codable {
+    public let properties: Sheet.SheetProperties
+    public let fields: String
+    
+    public init(properties: Sheet.SheetProperties, fields: String) {
+        self.properties = properties
+        self.fields = fields
     }
 }

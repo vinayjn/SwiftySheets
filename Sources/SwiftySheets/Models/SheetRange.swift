@@ -65,6 +65,18 @@ public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByString
         }
         return result - 1
     }
+
+    
+    public static func indexToColumn(_ index: Int) -> String {
+        var i = index + 1
+        var col = ""
+        while i > 0 {
+            let remainder = (i - 1) % 26
+            col = String(UnicodeScalar(65 + remainder)!) + col
+            i = (i - 1) / 26
+        }
+        return col
+    }
     
     private static func parseCell(_ cell: String) -> (col: String?, row: Int?) {
         // Separate letters and numbers

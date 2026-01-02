@@ -180,6 +180,51 @@ public extension Spreadsheet {
         )
         try await batchUpdate(requests: [request])
     }
+    
+    // MARK: - Developer Experience
+    
+    func cell(_ range: String) async throws -> String? {
+        let values = try await self.values(range: range)
+        return values.first?.first
+    }
+    
+    func cell(row: Int, column: Int) async throws -> String? {
+        // row is 1-based, column is 1-based.
+        // Convert to A1.
+        // Col 1 -> index 0 -> "A"
+        let colStr = SheetRange.indexToColumn(column - 1)
+        let range = "\(colStr)\(row)"
+        // If sheet name? This assumes active sheet or default?
+        // The API `cell(_ range)` uses Range string which can contain sheet name.
+        // If row/col is used, we usually imply the first sheet or need a sheet name argument.
+        // Let's assume default sheet for now or require sheet name in a separate overload if needed.
+        // For DX, simpliest is default.
+        return try await cell(range)
+    }
+    
+    // Access with Sheet Name
+    func cell(sheet: String, row: Int, column: Int) async throws -> String? {
+        let colStr = SheetRange.indexToColumn(column - 1)
+        let range = "\(sheet)!\(colStr)\(row)"
+        return try await cell(range)
+    }
+
+    func resize(sheetId: Int, rows: Int, columns: Int) async throws {
+        // Need to find existing properties to preserve index/title?
+        // No, UpdateSheetProperties with fields="gridProperties" only updates those fields.
+        // But we need the sheetId in the properties object.
+        let gridProps = Sheet.GridProperties(rowCount: rows, columnCount: columns)
+        let props = Sheet.SheetProperties(
+            sheetId: sheetId,
+            title: "", // Ignored by fields mask
+            index: 0, // Ignored
+            gridProperties: gridProps
+        )
+        let request = BatchUpdateRequest.Request.updateSheetProperties(
+            UpdateSheetPropertiesRequest(properties: props, fields: "gridProperties")
+        )
+        try await batchUpdate(requests: [request])
+    }
 
     private func resolveGridRange(from range: String) throws -> GridRange {
         let sheetRange = SheetRange(stringLiteral: range)

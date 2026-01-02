@@ -141,7 +141,22 @@ struct SwiftySheetsDemo {
             try await spreadsheet.clearValues(range: "DemoSheet!A2:C") // Keep headers
             print("✅ Data cleared.")
             
-            // 10. Clean up
+            // 10. DX: Resize Sheet
+            print("📏 Resizing 'DemoSheet' to 50 rows x 5 columns...")
+            // Need sheet ID. We have it in `sheetId` variable.
+            try await spreadsheet.resize(sheetId: sheetId, rows: 50, columns: 5)
+            // Verify?
+            try await spreadsheet.refreshMetadata()
+            let resizedSheet = try spreadsheet.sheet(named: "DemoSheet")
+            print("   New size: \(resizedSheet.rowCount) x \(resizedSheet.columnCount)")
+            
+            // 11. DX: Easy Cell Access
+            print("🔍 Reading cell A1...")
+            if let val = try await spreadsheet.cell(sheet: "DemoSheet", row: 1, column: 1) {
+                print("   A1: \(val)")
+            }
+
+            // 12. Clean up
             print("🧹 Cleaning up (Deleting Sheet ID: \(sheetId))...")
             try await spreadsheet.batchUpdate {
                 DeleteSheet(id: sheetId)

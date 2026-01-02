@@ -464,6 +464,8 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         ("testFormatting", testFormatting),
         ("testClearValues", testClearValues),
         ("testSort", testSort),
+        ("testCellAccess", testCellAccess),
+        ("testResize", testResize),
     ]
     
     func testCreateSpreadsheet() async throws {
@@ -576,6 +578,41 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         mockSession.mockData = try JSONEncoder().encode(BatchUpdateResponse(spreadsheetId: TestConstants.spreadsheetID))
         
         try await spreadsheet.sort(range: "Sheet1!A1:C10", column: 0, ascending: true)
+    }
+    
+    func testCellAccess() async throws {
+        setupMockSpreadsheetResponse()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        // Mock simple value response
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        let valueRange = ValueRange(range: "A1", values: [["Test"]])
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = try JSONEncoder().encode(valueRange)
+        
+        let val = try await spreadsheet.cell(sheet: "Sheet1", row: 1, column: 1)
+        XCTAssertEqual(val, "Test")
+    }
+    
+    func testResize() async throws {
+        setupMockSpreadsheetResponse()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = try JSONEncoder().encode(BatchUpdateResponse(spreadsheetId: TestConstants.spreadsheetID))
+        
+        try await spreadsheet.resize(sheetId: 0, rows: 100, columns: 20)
     }
 }
 
