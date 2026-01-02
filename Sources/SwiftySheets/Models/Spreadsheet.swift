@@ -20,6 +20,11 @@ public struct Spreadsheet {
         self.id = id
         metadata = try await Self.fetchMetadata(id: id, client: client)
     }
+    init(client: Client, metadata: Metadata) {
+        self.client = client
+        self.id = metadata.spreadsheetId
+        self.metadata = metadata
+    }
 }
 
 private extension Spreadsheet {

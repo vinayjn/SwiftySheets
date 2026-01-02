@@ -39,6 +39,18 @@ public final class Client {
         
         return try JSONDecoder().decode(T.self, from: data)
     }
+
+    func makeRequest(_ request: URLRequest) async throws {
+        let (data, response) = try await transport.send(request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SheetsError.invalidResponse(status: 500)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            try handleErrorResponse(data: data, statusCode: httpResponse.statusCode, headers: httpResponse.allHeaderFields)
+        }
+    }
     
     private func handleErrorResponse(data: Data, statusCode: Int, headers: [AnyHashable: Any]) throws -> Never {
         let retryAfter = extractRetryAfter(from: headers)
@@ -79,6 +91,32 @@ public final class Client {
 public extension Client {
     func spreadsheet(id: String) async throws -> Spreadsheet {
         try await Spreadsheet(client: self, id: id)
+    }
+    
+    func createSpreadsheet(title: String) async throws -> Spreadsheet {
+        // We need a request body with just 'properties'. 
+        // Our Metadata struct has more fields but JSONEncoder might encode defaults or empty strings if we use it directly.
+        // It's cleaner to define a tailored Encodable struct for creation or map manually.
+        // Let's use a dictionary for simplicity or a private struct.
+        let body: [String: Any] = ["properties": ["title": title]]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        
+        let request = try Endpoint.create.request(with: bodyData)
+        let responseMetadata: Spreadsheet.Metadata = try await makeRequest(request)
+        
+        return Spreadsheet(client: self, metadata: responseMetadata)
+    }
+    
+    func deleteSpreadsheet(id: String) async throws {
+        let request = try DriveEndpoint.delete(fileId: id).request()
+        try await makeRequest(request)
+    }
+    
+    func listSpreadsheets() async throws -> [DriveFile] {
+        let query = "mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false"
+        let request = try DriveEndpoint.list(query: query).request()
+        let response: DriveFileList = try await makeRequest(request)
+        return response.files
     }
     
     func updateValues(

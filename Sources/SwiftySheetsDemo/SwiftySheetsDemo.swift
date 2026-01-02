@@ -20,32 +20,27 @@ struct SwiftySheetsDemo {
             exit(1)
         }
 
-        guard let spreadsheetId = ProcessInfo.processInfo.environment["SWIFTYSHEETS_SPREADSHEET_ID"] else {
-            print("❌ Missing environment variable: SWIFTYSHEETS_SPREADSHEET_ID")
-            exit(1)
-        }
-        
-        guard FileManager.default.fileExists(atPath: jsonPath) else {
-            print("❌ Error: Service account JSON not found at \(jsonPath)")
-            print("ℹ️ Please place your 'service_account.json' there or update the path in main.swift")
-            exit(1)
-        }
+        // 2. Determine Spreadsheet ID
+        let envSpreadsheetId = ProcessInfo.processInfo.environment["SWIFTYSHEETS_SPREADSHEET_ID"]
+        var createdSpreadsheetId: String? = nil
+        var spreadsheet: Spreadsheet
         
         do {
             let credentials = try ServiceAccountCredentials(jsonPath: jsonPath)
             let client = Client(credentials: credentials)
             
-            // 2. Create a Spreadsheet
-            print("📝 Creating new spreadsheet...")
-            // Note: In a real scenario we'd need a create endpoint, but for now let's assume we use an existing one or just skip creation if not implemented yet.
-            // Requirement said "Support everything google sheets does", but we implemented read/write/batchUpdate.
-            // Let's use a hardcoded Test ID if we don't have create implemented or implement create now?
-            // Checking coverage: We didn't explicitly implement `createSpreadsheet` in Client yet, only `spreadsheet(id:)`. 
-            // So let's use the one from tests or ask user. I'll use the one from tests for demo purposes.
-            print("ℹ️ Using Spreadsheet ID: \(spreadsheetId)")
+            if let id = envSpreadsheetId {
+                print("ℹ️ Using ID from ENV: \(id)")
+                spreadsheet = try await client.spreadsheet(id: id)
+            } else {
+                print("📝 No ID provided. Creating a temporary spreadsheet...")
+                let title = "SwiftySheets Demo \(Int(Date().timeIntervalSince1970))"
+                spreadsheet = try await client.createSpreadsheet(title: title)
+                createdSpreadsheetId = spreadsheet.metadata.spreadsheetId
+                print("✅ Created Spreadsheet: \(title) (ID: \(spreadsheet.metadata.spreadsheetId))")
+            }
             
-            var spreadsheet = try await client.spreadsheet(id: spreadsheetId)
-            print("✅ Found Spreadsheet: \(spreadsheet.metadata.properties.title)")
+            print("✅ Ready to work on: \(spreadsheet.metadata.properties.title)")
             
             // 3. Add a Sheet using DSL
             print("PAGE: Adding a new sheet 'DemoSheet'...")
@@ -126,6 +121,13 @@ struct SwiftySheetsDemo {
             print("✅ Sheet deleted.")
             
             print("🎉 Demo completed successfully!")
+            
+            // 9. Cleanup Created Spreadsheet
+            if let createdId = createdSpreadsheetId {
+                print("🗑️ Deleting temporary spreadsheet: \(createdId)...")
+                try await client.deleteSpreadsheet(id: createdId)
+                print("✅ Spreadsheet deleted.")
+            }
             
         } catch {
             print("❌ Error: \(error)")

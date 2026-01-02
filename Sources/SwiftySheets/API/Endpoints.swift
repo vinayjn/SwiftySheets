@@ -7,6 +7,7 @@ public enum Endpoint {
     private static let baseURL = "https://sheets.googleapis.com/v4/spreadsheets"
 
     case spreadsheet(id: String)
+    case create
     case values(
         spreadsheetId: String,
         range: String,
@@ -38,6 +39,10 @@ extension Endpoint {
         switch self {
         case let .spreadsheet(id):
             components.path = "/v4/spreadsheets/\(id)"
+            return try components.asURL()
+
+        case .create:
+            components.path = "/v4/spreadsheets"
             return try components.asURL()
 
         case let .values(id, range, valueRenderOption, dateTimeRenderOption):
@@ -75,7 +80,7 @@ extension Endpoint {
         switch self {
         case .spreadsheet, .values:
             request.httpMethod = "GET"
-        case .batchUpdate, .appendValues:
+        case .batchUpdate, .appendValues, .create:
             request.httpMethod = "POST"
         case .updateValues:
             request.httpMethod = "PUT"

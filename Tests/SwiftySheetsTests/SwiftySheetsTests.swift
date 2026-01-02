@@ -458,7 +458,68 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         ("testSheetRowMacro", testSheetRowMacro),
         ("testTypeSafeUpdateValues", testTypeSafeUpdateValues),
         ("testTypeSafeAppendValues", testTypeSafeAppendValues),
+        ("testCreateSpreadsheet", testCreateSpreadsheet),
+        ("testDeleteSpreadsheet", testDeleteSpreadsheet),
+        ("testListSpreadsheets", testListSpreadsheets),
     ]
+    
+    func testCreateSpreadsheet() async throws {
+        // ... (existing testCreateSpreadsheet code) ...
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        // ... (rest of create test) ...
+        let metadata = Spreadsheet.Metadata(
+            spreadsheetId: "new-id",
+            properties: Spreadsheet.Metadata.Properties(title: "New Sheet"),
+            sheets: []
+        )
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = try JSONEncoder().encode(metadata)
+        
+        // This implicitly tests deserialization of the response and request construction
+        let sheet = try await client.createSpreadsheet(title: "New Sheet")
+        XCTAssertEqual(sheet.metadata.spreadsheetId, "new-id")
+        XCTAssertEqual(sheet.metadata.properties.title, "New Sheet")
+    }
+
+    func testDeleteSpreadsheet() async throws {
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 204,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = Data()
+        
+        // Should not throw
+        try await client.deleteSpreadsheet(id: "del-id")
+    }
+    
+    func testListSpreadsheets() async throws {
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        
+        let fileList = DriveFileList(files: [
+             DriveFile(id: "id1", name: "Sheet 1", mimeType: "application/vnd.google-apps.spreadsheet"),
+             DriveFile(id: "id2", name: "Sheet 2", mimeType: "application/vnd.google-apps.spreadsheet")
+        ])
+        
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = try JSONEncoder().encode(fileList)
+        
+        let validFiles = try await client.listSpreadsheets()
+        XCTAssertEqual(validFiles.count, 2)
+        XCTAssertEqual(validFiles[0].name, "Sheet 1")
+    }
 }
 
 @SheetRow
