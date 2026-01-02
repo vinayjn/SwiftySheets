@@ -1,20 +1,18 @@
 # SwiftySheets
 
-A Swift library for interacting with Google Sheets API using modern Swift concurrency.
+A modern, type-safe Swift library for interacting with Google Sheets API, built with Swift Concurrency and Macros.
 
 ## Features
 
-- **Modern Swift Concurrency**: Built with async/await from the ground up
-- **Service Account Authentication**: Secure authentication using Google service account credentials
-- **Type-Safe API**: Enum-based endpoints and comprehensive error handling
-- **Testable Design**: Protocol-oriented architecture with dependency injection
-- **Cross-Platform**: Supports macOS 13+ and iOS 15+
+- **Modern Concurrency**: Async/await based API.
+- **Type-Safe Macros**: `@SheetRow` and `@Column` macros for easy object mapping.
+- **Declarative DSL**: SwiftUI-like syntax for batch updates (e.g., creating sheets).
+- **Service Account Auth**: Secure server-side authentication.
+- **Comprehensive API**: Read, Write, Append, and Manage Sheets.
 
 ## Installation
 
-### Swift Package Manager
-
-Add SwiftySheets to your project using Swift Package Manager:
+Add SwiftySheets to your `Package.swift`:
 
 ```swift
 dependencies: [
@@ -22,143 +20,116 @@ dependencies: [
 ]
 ```
 
-## Prerequisites
-
-1. **Google Cloud Project**: Create a project in [Google Cloud Console](https://console.cloud.google.com/)
-2. **Enable APIs**: Enable Google Sheets API and Google Drive API
-3. **Service Account**: Create a service account and download the JSON credentials file
-4. **Share Spreadsheet**: Share your Google Sheets with the service account email
-
 ## Quick Start
+
+### 1. Setup Client
 
 ```swift
 import SwiftySheets
 
-// Initialize with service account credentials
-let credentials = try ServiceAccountCredentials(
-    jsonPath: "/path/to/service-account.json",
-    scopes: [SpreadsheetScope.readwrite, DriveScope.readwrite]
-)
-
+let credentials = try ServiceAccountCredentials(jsonPath: "/path/to/service-account.json")
 let client = Client(credentials: credentials)
+```
 
-// Access a spreadsheet
+### 2. Access a Spreadsheet
+
+```swift
 let spreadsheet = try await client.spreadsheet(id: "your-spreadsheet-id")
-
-// Read values from a range
-let values = try await spreadsheet.values(range: "A1:C10")
-print(values) // [["Name", "Age", "City"], ["John", "30", "NYC"], ...]
-
-// Get sheet information
-let sheets = try spreadsheet.sheets()
-let specificSheet = try spreadsheet.sheet(named: "Sheet1")
+print("Title: \(spreadsheet.metadata.properties.title)")
 ```
 
-## Authentication
+### 3. Define Data Models (Macros)
 
-### Service Account (Recommended)
-
-```swift
-let credentials = try ServiceAccountCredentials(
-    jsonPath: "/path/to/service-account.json",
-    scopes: [SpreadsheetScope.readwrite, DriveScope.readwrite]
-)
-```
-
-### Available Scopes
+Use the `@SheetRow` macro to map Swift structs to spreadsheet rows.
 
 ```swift
-// Spreadsheet scopes
-SpreadsheetScope.readonly    // Read-only access to spreadsheets
-SpreadsheetScope.readwrite   // Read/write access to spreadsheets
-
-// Drive scopes  
-DriveScope.readonly          // Read-only access to Drive
-DriveScope.readwrite         // Read/write access to Drive
-```
-
-## API Reference
-
-### Client
-
-```swift
-let client = Client(credentials: credentials)
-let spreadsheet = try await client.spreadsheet(id: "spreadsheet-id")
-```
-
-### Spreadsheet
-
-```swift
-// Read values with options
-let values = try await spreadsheet.values(
-    range: "A1:Z100",
-    valueRenderOption: .unformatted,
-    dateTimeRenderOption: .serialNumber
-)
-
-// Get sheet metadata
-let sheets = try spreadsheet.sheets()
-let namedSheet = try spreadsheet.sheet(named: "MySheet")
-
-// Refresh metadata
-try await spreadsheet.refreshMetadata()
-```
-
-### Value Rendering Options
-
-```swift
-ValueRenderOption.formatted      // Returns formatted values
-ValueRenderOption.unformatted    // Returns raw values
-ValueRenderOption.formula        // Returns formulas
-
-DateRenderOption.serialNumber    // Returns dates as serial numbers
-DateRenderOption.formattedString // Returns formatted date strings
-```
-
-## Error Handling
-
-SwiftySheets provides comprehensive error handling:
-
-```swift
-do {
-    let spreadsheet = try await client.spreadsheet(id: "invalid-id")
-} catch SheetsError.spreadsheetNotFound(let message) {
-    print("Spreadsheet not found: \(message)")
-} catch SheetsError.authenticationFailed {
-    print("Authentication failed")
-} catch SheetsError.invalidResponse(let status) {
-    print("HTTP error: \(status)")
+@SheetRow
+struct User {
+    @Column("A") var name: String
+    @Column("B") var email: String
+    @Column(index: 2) var score: Int
 }
 ```
 
-## Testing
-
-SwiftySheets is designed for testability with protocol-oriented architecture:
+### 4. Read Data
 
 ```swift
-// Mock URLSession for testing
-class MockURLSession: URLSessionProtocol {
-    // Implementation
-}
+// Read rows as directly mapped objects
+let users = try await spreadsheet.values(
+    range: "Sheet1!A1:C",
+    type: User.self
+)
 
-// Mock credentials
-class MockCredentials: GoogleCredentials {
-    // Implementation
+for user in users {
+    print("\(user.name): \(user.score)")
 }
+```
 
-let client = Client(
-    credentials: MockCredentials(),
-    session: MockURLSession()
+### 5. Write Data
+
+```swift
+let newUsers = [
+    User(name: "Alice", email: "alice@example.com", score: 100),
+    User(name: "Bob", email: "bob@example.com", score: 95)
+]
+
+// Encode objects to raw values
+let values = try newUsers.map { try $0.encodeRow() }
+
+// Update values
+let result = try await spreadsheet.updateValues(
+    range: "Sheet1!A1",
+    values: values
 )
 ```
 
-## Requirements
+### 6. Manage Sheets (DSL)
 
-- Swift 6.0+
-- macOS 13.0+ / iOS 15.0+
-- Google Cloud Project with Sheets API enabled
-- Service account credentials
+Use the declarative DSL for batch updates like adding or deleting sheets.
+
+```swift
+// Add a new sheet and delete an old one in a single batch request
+let response = try await spreadsheet.batchUpdate {
+    AddSheet("Quarterly Report") {
+        GridProperties(rowCount: 100, columnCount: 20)
+        TabColor(red: 1.0, green: 0.0, blue: 0.0) // Red tab
+    }
+    
+    DeleteSheet(id: oldSheetId)
+}
+```
+
+## Running the Demo
+
+This repository includes a CLI demo. To run it, you need a Google Service Account JSON file and a Spreadsheet ID.
+
+```bash
+# Set environment variables
+export SWIFTYSHEETS_SERVICE_ACCOUNT_PATH="/path/to/your/service_account.json"
+export SWIFTYSHEETS_SPREADSHEET_ID="your_spreadsheet_id"
+
+# Run the demo
+swift run SwiftySheetsDemo
+```
+
+## Advanced Usage
+
+### Raw Values
+You can also read/write raw string arrays if you don't want to use Codable models.
+
+```swift
+let values = try await spreadsheet.values(range: "Sheet1!A1:B2")
+// values is [[String]]
+```
+
+### Append Data
+```swift
+try await spreadsheet.appendValues(
+    range: "Sheet1!A1",
+    values: [["New Entry", "123"]]
+)
+```
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT License. See [LICENSE](LICENSE) for details.
