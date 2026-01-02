@@ -24,10 +24,13 @@ public enum Endpoint {
 }
 
 extension Endpoint {
+    private static let apiScheme = "https"
+    private static let apiHost = "sheets.googleapis.com"
+
     func url() throws -> URL {
         var components = URLComponents()
-        components.scheme = "https"
-        components.host = "sheets.googleapis.com"
+        components.scheme = Self.apiScheme
+        components.host = Self.apiHost
         
         switch self {
         case let .spreadsheet(id):
