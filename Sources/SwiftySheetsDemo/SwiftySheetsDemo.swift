@@ -73,31 +73,44 @@ struct SwiftySheetsDemo {
             }
             print("✅ Sheet added with ID: \(sheetId)")
             
-            // 4. Write Data using Macro Structs
-            print("✍️ Writing data...")
+            // 4. Raw Data Operations (Non-Type Safe)
+            print("📝 [Raw] Writing header row...")
+            _ = try await spreadsheet.updateValues(
+                range: "DemoSheet!A1:C1",
+                values: [["Name", "Email", "Score"]]
+            )
+            
+            print("📖 [Raw] Reading headers back...")
+            let headers = try await spreadsheet.values(range: "DemoSheet!A1:C1")
+            print("   Headers: \(headers.first ?? [])")
+            
+            // 5. Type-Safe Write using Macros
+            print("✍️ [Type-Safe] Writing user data...")
             let users = [
                 try DemoUser(row: ["Alice", "alice@test.com", "100"]),
-                try DemoUser(row: ["Bob", "bob@test.com", "250"]),
-                try DemoUser(row: ["Charlie", "charlie@test.com", "50"])
+                try DemoUser(row: ["Bob", "bob@test.com", "250"])
             ]
             
-            // Convert to [[String]] for update (Currently updateValues takes [[String]])
-            // Future improvement: overload updateValues to take [SheetRowEncodable]
-            let values = try users.map { try $0.encodeRow() }
-            
-            // Use the correct sheet name in range. 
-            // Note: If 'DemoSheet' already existed, we might be writing to the old one if we didn't catch the ID error.
-            // But now we are sure we created a new one or got an error.
-            _ = try await spreadsheet.updateValues(
-                range: "DemoSheet!A1",
-                values: values
+            // New Generic API
+            try await spreadsheet.updateValues(
+                range: "DemoSheet!A2",
+                values: users
             )
-            print("✅ Data written.")
+            print("✅ Users written.")
             
-            // 5. Read Data Back
-            print("📖 Reading data back...")
+            // 6. Type-Safe Append
+            print("➕ [Append] Appending a new user...")
+            let newUser = try DemoUser(row: ["Charlie", "charlie@test.com", "50"])
+            try await spreadsheet.appendValues(
+                range: "DemoSheet!A1", // A1 is enough, Google finds the next empty row
+                values: [newUser]
+            )
+            print("✅ User appended.")
+            
+            // 7. Type-Safe Read
+            print("📖 [Type-Safe] Reading all users...")
             let readUsers = try await spreadsheet.values(
-                range: "DemoSheet!A1:C",
+                range: "DemoSheet!A2:C", // Skip header
                 type: DemoUser.self
             )
             
@@ -105,7 +118,7 @@ struct SwiftySheetsDemo {
                 print("   - \(user.name) (\(user.email)): \(user.score) points")
             }
             
-            // 6. Clean up
+            // 8. Clean up
             print("🧹 Cleaning up (Deleting Sheet ID: \(sheetId))...")
             try await spreadsheet.batchUpdate {
                 DeleteSheet(id: sheetId)

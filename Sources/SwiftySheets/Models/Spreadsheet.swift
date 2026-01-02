@@ -124,4 +124,32 @@ public extension Spreadsheet {
     func batchUpdate(@BatchUpdateBuilder _ builder: @Sendable () -> [BatchUpdateRequest.Request]) async throws -> BatchUpdateResponse {
         try await batchUpdate(requests: builder())
     }
+    
+    @discardableResult
+    func updateValues<T: SheetRowEncodable>(
+        range: String,
+        values: [T],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        let encodedValues = try values.map { try $0.encodeRow() }
+        return try await updateValues(
+            range: range,
+            values: encodedValues,
+            valueInputOption: valueInputOption
+        )
+    }
+    
+    @discardableResult
+    func appendValues<T: SheetRowEncodable>(
+        range: String,
+        values: [T],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        let encodedValues = try values.map { try $0.encodeRow() }
+        return try await appendValues(
+            range: range,
+            values: encodedValues,
+            valueInputOption: valueInputOption
+        )
+    }
 }

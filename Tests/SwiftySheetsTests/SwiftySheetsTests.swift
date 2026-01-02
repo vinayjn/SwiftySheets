@@ -8,15 +8,39 @@ enum TestConstants {
 }
 
 final class MockURLSession: URLSessionProtocol, @unchecked Sendable {
-    var mockData: Data?
-    var mockResponse: URLResponse?
-    var mockError: Error?
+    var responseQueue: [(Data, URLResponse, Error?)] = []
+    
+    // Legacy support: Setting these resets the queue to a single item
+    var mockData: Data? {
+        didSet { updateSingleItemQueue() }
+    }
+    var mockResponse: URLResponse? {
+        didSet { updateSingleItemQueue() }
+    }
+    var mockError: Error? {
+        didSet { updateSingleItemQueue() }
+    }
+    
+    private func updateSingleItemQueue() {
+        // If we are setting legacy props, we assume a single response scenario
+        let d = mockData ?? Data()
+        let r = mockResponse ?? HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        responseQueue = [(d, r, mockError)]
+    }
+    
+    func queue(data: Data, response: URLResponse? = nil, error: Error? = nil) {
+        let resp = response ?? HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        responseQueue.append((data, resp, error))
+    }
     
     func data(for request: URLRequest, delegate: (any URLSessionTaskDelegate)?) async throws -> (Data, URLResponse) {
-        if let error = mockError {
-            throw error
+        if !responseQueue.isEmpty {
+            let (data, response, error) = responseQueue.removeFirst()
+            if let error = error { throw error }
+            return (data, response)
         }
-        return (mockData ?? Data(), mockResponse ?? URLResponse())
+        // Fallback or error
+        return (Data(), HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
     }
 }
 
@@ -373,6 +397,42 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         let encoded = try user.encodeRow()
         XCTAssertEqual(encoded, ["Alice", "alice@example.com", "100"])
     }
+    
+    func testTypeSafeUpdateValues() async throws {
+        // 1. Queue Metadata Response
+        let metadata = Spreadsheet.Metadata(
+            spreadsheetId: "id",
+            properties: Spreadsheet.Metadata.Properties(title: "Test"),
+            sheets: []
+        )
+        mockSession.queue(data: try JSONEncoder().encode(metadata))
+        
+        // 2. Queue Update Response
+        let updateResponse = UpdateValuesResponse(spreadsheetId: "id", updatedRange: "A1", updatedRows: 1, updatedColumns: 3, updatedCells: 3)
+        mockSession.queue(data: try JSONEncoder().encode(updateResponse))
+        
+        let users = [try TestUser(row: ["Alice", "a@b.com", "10"])]
+        
+        _ = try await client.spreadsheet(id: "id").updateValues(range: "A1", values: users)
+    }
+    
+    func testTypeSafeAppendValues() async throws {
+        // 1. Queue Metadata Response
+        let metadata = Spreadsheet.Metadata(
+            spreadsheetId: "id",
+            properties: Spreadsheet.Metadata.Properties(title: "Test"),
+            sheets: []
+        )
+        mockSession.queue(data: try JSONEncoder().encode(metadata))
+        
+        // 2. Queue Append Response
+        let updateResponse = UpdateValuesResponse(spreadsheetId: "id", updatedRange: "A1", updatedRows: 1, updatedColumns: 3, updatedCells: 3)
+        mockSession.queue(data: try JSONEncoder().encode(updateResponse))
+        
+        let users = [try TestUser(row: ["Bob", "b@c.com", "20"])]
+        
+        _ = try await client.spreadsheet(id: "id").appendValues(range: "A1", values: users)
+    }
 
     static let allTests = [
         ("testSpreadsheetWithID", testSpreadsheetWithID),
@@ -391,11 +451,13 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         ("testSheetRange", testSheetRange),
         ("testBatchUpdateDSL", testBatchUpdateDSL),
         ("testSheetRowMacro", testSheetRowMacro),
+        ("testTypeSafeUpdateValues", testTypeSafeUpdateValues),
+        ("testTypeSafeAppendValues", testTypeSafeAppendValues),
     ]
 }
 
 @SheetRow
-struct TestUser {
+struct TestUser: SheetRowCodable {
     @Column("A") var name: String
     @Column("B") var email: String
     @Column(index: 2) var points: Int
