@@ -167,6 +167,13 @@ public extension Client {
     }
     
     @discardableResult
+    func clearValues(spreadsheetId: String, range: String) async throws -> ClearValuesResponse {
+        // Empty body for clear request
+        let request = try Endpoint.clearValues(spreadsheetId: spreadsheetId, range: range).request(with: Data("{}".utf8))
+        return try await makeRequest(request)
+    }
+    
+    @discardableResult
     func batchUpdate(
         spreadsheetId: String,
         @BatchUpdateBuilder requests: @Sendable () -> [BatchUpdateRequest.Request]

@@ -159,6 +159,29 @@ public extension Spreadsheet {
     }
     
     func format(range: String, format: CellFormat) async throws {
+        let gridRange = try resolveGridRange(from: range)
+        
+        let cellData = CellData(userEnteredFormat: format)
+        let request = BatchUpdateRequest.Request.repeatCell(
+            RepeatCellRequest(range: gridRange, cell: cellData, fields: "userEnteredFormat")
+        )
+        
+        try await batchUpdate(requests: [request])
+    }
+    
+    func sort(range: String, column: Int, ascending: Bool = true) async throws {
+        let gridRange = try resolveGridRange(from: range)
+        let sortSpec = SortSpec(
+            dimensionIndex: column,
+            sortOrder: ascending ? .ascending : .descending
+        )
+        let request = BatchUpdateRequest.Request.sortRange(
+            SortRangeRequest(range: gridRange, sortSpecs: [sortSpec])
+        )
+        try await batchUpdate(requests: [request])
+    }
+
+    private func resolveGridRange(from range: String) throws -> GridRange {
         let sheetRange = SheetRange(stringLiteral: range)
         
         // 1. Resolve Sheet ID
@@ -193,19 +216,17 @@ public extension Spreadsheet {
              endColumnIndex = start + 1
         }
         
-        let gridRange = GridRange(
+        return GridRange(
             sheetId: sheetId,
             startRowIndex: startRowIndex,
             endRowIndex: endRowIndex,
             startColumnIndex: startColumnIndex,
             endColumnIndex: endColumnIndex
         )
-        
-        let cellData = CellData(userEnteredFormat: format)
-        let request = BatchUpdateRequest.Request.repeatCell(
-            RepeatCellRequest(range: gridRange, cell: cellData, fields: "userEnteredFormat")
-        )
-        
-        try await batchUpdate(requests: [request])
+    }
+    
+    @discardableResult
+    func clearValues(range: String) async throws -> ClearValuesResponse {
+        try await client.clearValues(spreadsheetId: id, range: range)
     }
 }

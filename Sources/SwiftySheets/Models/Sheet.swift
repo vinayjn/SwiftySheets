@@ -156,6 +156,11 @@ public struct AppendValuesResponse: Codable {
     public let updates: UpdateValuesResponse
 }
 
+public struct ClearValuesResponse: Codable {
+    public let spreadsheetId: String
+    public let clearedRange: String
+}
+
 public struct BatchUpdateRequest: Encodable {
     public let requests: [Request]
     
@@ -164,12 +169,14 @@ public struct BatchUpdateRequest: Encodable {
         case addSheet(AddSheetRequest)
         case deleteSheet(DeleteSheetRequest)
         case repeatCell(RepeatCellRequest)
+        case sortRange(SortRangeRequest)
         
         enum CodingKeys: String, CodingKey {
             case updateCells
             case addSheet
             case deleteSheet
             case repeatCell
+            case sortRange
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -183,6 +190,8 @@ public struct BatchUpdateRequest: Encodable {
                 try container.encode(request, forKey: .deleteSheet)
             case .repeatCell(let request):
                 try container.encode(request, forKey: .repeatCell)
+            case .sortRange(let request):
+                try container.encode(request, forKey: .sortRange)
             }
         }
     }
@@ -250,6 +259,31 @@ public struct DeleteSheetRequest: Codable {
     public init(sheetId: Int) {
         self.sheetId = sheetId
     }
+}
+
+public struct SortRangeRequest: Codable {
+    public let range: GridRange
+    public let sortSpecs: [SortSpec]
+    
+    public init(range: GridRange, sortSpecs: [SortSpec]) {
+        self.range = range
+        self.sortSpecs = sortSpecs
+    }
+}
+
+public struct SortSpec: Codable {
+    public let dimensionIndex: Int
+    public let sortOrder: SortOrder
+    
+    public init(dimensionIndex: Int, sortOrder: SortOrder) {
+        self.dimensionIndex = dimensionIndex
+        self.sortOrder = sortOrder
+    }
+}
+
+public enum SortOrder: String, Codable {
+    case ascending = "ASCENDING"
+    case descending = "DESCENDING"
 }
 
 public struct RepeatCellRequest: Codable {

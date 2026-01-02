@@ -462,6 +462,8 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         ("testDeleteSpreadsheet", testDeleteSpreadsheet),
         ("testListSpreadsheets", testListSpreadsheets),
         ("testFormatting", testFormatting),
+        ("testClearValues", testClearValues),
+        ("testSort", testSort),
     ]
     
     func testCreateSpreadsheet() async throws {
@@ -541,6 +543,39 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         try await spreadsheet.format(range: "Sheet1!A1", format: format)
         
         // We assume success if no error thrown and request structure is correct (which we can't fully inspect without a spy, but encoding is checked).
+    }
+    
+    func testClearValues() async throws {
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        
+        let response = ClearValuesResponse(spreadsheetId: TestConstants.spreadsheetID, clearedRange: "Sheet1!A1")
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = try JSONEncoder().encode(response)
+        
+        let result = try await client.clearValues(spreadsheetId: TestConstants.spreadsheetID, range: "Sheet1!A1")
+        XCTAssertEqual(result.clearedRange, "Sheet1!A1")
+    }
+    
+    func testSort() async throws {
+        setupMockSpreadsheetResponse()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = try JSONEncoder().encode(BatchUpdateResponse(spreadsheetId: TestConstants.spreadsheetID))
+        
+        try await spreadsheet.sort(range: "Sheet1!A1:C10", column: 0, ascending: true)
     }
 }
 

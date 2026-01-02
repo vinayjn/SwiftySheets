@@ -116,7 +116,7 @@ struct SwiftySheetsDemo {
             
             // 7. Type-Safe Read
             print("📖 [Type-Safe] Reading all users...")
-            let readUsers = try await spreadsheet.values(
+            var readUsers = try await spreadsheet.values(
                 range: "DemoSheet!A2:C", // Skip header
                 type: DemoUser.self
             )
@@ -125,7 +125,23 @@ struct SwiftySheetsDemo {
                 print("   - \(user.name) (\(user.email)): \(user.score) points")
             }
             
-            // 8. Clean up
+            // 8. Sorting
+            print("🔃 Sorting by Score (Column C, Index 2)...")
+            // A2:C covers 3 columns. Column C is index 2 relative to A? 
+            // API SortSpec dimensionIndex is absolute index in the grid.
+            // Since A is 0, C is 2.
+            try await spreadsheet.sort(range: "DemoSheet!A2:C", column: 2, ascending: false) // Descending score
+            print("✅ Sorted.")
+            
+            readUsers = try await spreadsheet.values(range: "DemoSheet!A2:C", type: DemoUser.self)
+            print("   Top Scorer: \(readUsers.first?.name ?? "None")")
+
+            // 9. Clear Values
+            print("🧹 Clearing data...")
+            try await spreadsheet.clearValues(range: "DemoSheet!A2:C") // Keep headers
+            print("✅ Data cleared.")
+            
+            // 10. Clean up
             print("🧹 Cleaning up (Deleting Sheet ID: \(sheetId))...")
             try await spreadsheet.batchUpdate {
                 DeleteSheet(id: sheetId)

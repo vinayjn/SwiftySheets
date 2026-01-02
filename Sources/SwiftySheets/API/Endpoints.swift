@@ -25,6 +25,7 @@ public enum Endpoint {
         range: String,
         valueInputOption: String
     )
+    case clearValues(spreadsheetId: String, range: String)
 }
 
 extension Endpoint {
@@ -70,6 +71,10 @@ extension Endpoint {
                 URLQueryItem(name: "valueInputOption", value: valueInputOption)
             ]
             return try components.asURL()
+
+        case let .clearValues(id, range):
+            components.path = "/v4/spreadsheets/\(id)/values/\(range):clear"
+            return try components.asURL()
         }
     }
 
@@ -80,7 +85,7 @@ extension Endpoint {
         switch self {
         case .spreadsheet, .values:
             request.httpMethod = "GET"
-        case .batchUpdate, .appendValues, .create:
+        case .batchUpdate, .appendValues, .create, .clearValues:
             request.httpMethod = "POST"
         case .updateValues:
             request.httpMethod = "PUT"
