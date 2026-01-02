@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 public enum Endpoint {
     private static let baseURL = "https://sheets.googleapis.com/v4/spreadsheets"

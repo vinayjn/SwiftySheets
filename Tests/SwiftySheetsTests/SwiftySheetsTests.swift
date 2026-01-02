@@ -1,6 +1,9 @@
 @testable import SwiftySheets
 import XCTest
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 enum TestConstants {
     static let jsonPath = "/dummy/path/service_account.json"
