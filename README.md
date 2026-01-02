@@ -130,6 +130,59 @@ try await spreadsheet.appendValues(
 )
 ```
 
+### 7. Formatting & Styling
+
+Apply cell formatting like colors, bold text, and alignment.
+
+```swift
+let headerFormat = CellFormat(
+    backgroundColor: .blue,
+    textFormat: TextFormat(foregroundColor: .white, bold: true),
+    horizontalAlignment: .center
+)
+
+try await spreadsheet.format(range: "Sheet1!A1:Z1", format: headerFormat)
+```
+
+### 8. Advanced Operations
+
+#### Sorting & Clearing
+```swift
+// Clear values
+try await spreadsheet.clearValues(range: "Sheet1!A1:C10")
+
+// Sort range
+try await spreadsheet.sort(range: "Sheet1!A1:C10", column: 0, ascending: true)
+```
+
+#### Developer Experience Helpers
+We provide helpers for common tasks to avoid boilerplate.
+
+```swift
+// Easy Cell Access
+let val = try await spreadsheet.cell("Sheet1!A1")
+let val2 = try await spreadsheet.cell(row: 1, column: 1)
+
+// Resize Sheet
+try await spreadsheet.resize(sheetId: 123, rows: 1000, columns: 50)
+
+// Sheet Properties
+print("\(sheet.title): \(sheet.rowCount) rows")
+```
+
+### 9. Extended DSL
+The DSL supports advanced operations. Note that `Sheet` objects are required for context.
+
+```swift
+let sheet = try spreadsheet.sheet(named: "Report")
+
+try await spreadsheet.batchUpdate {
+    FormatCells(sheet: sheet, range: "A1:Z1", format: headerFormat)
+    SortRange(sheet: sheet, range: "A2:Z", column: 0)
+    ResizeSheet(sheet: sheet, rows: 50, columns: 10)
+}
+```
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
