@@ -439,35 +439,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         _ = try await client.spreadsheet(id: "id").appendValues(range: "A1", values: users)
     }
 
-    static let allTests = [
-        ("testSpreadsheetWithID", testSpreadsheetWithID),
-        ("testAllSheetsInSpreadsheet", testAllSheetsInSpreadsheet),
-        ("testNamedSheetInSpreadsheet", testNamedSheetInSpreadsheet),
-        ("testErrorHandling401", testErrorHandling401),
-        ("testErrorHandling403WithAPIError", testErrorHandling403WithAPIError),
-        ("testErrorHandling429WithRetryAfter", testErrorHandling429WithRetryAfter),
-        ("testSuccessfulResponseCodes", testSuccessfulResponseCodes),
-        ("testUpdateValuesRequest", testUpdateValuesRequest),
-        ("testAppendValuesRequest", testAppendValuesRequest),
-        ("testBatchUpdateRequest", testBatchUpdateRequest),
-        ("testUpdateValuesEndpoint", testUpdateValuesEndpoint),
-        ("testBatchUpdateEndpoint", testBatchUpdateEndpoint),
-        ("testAppendValuesEndpoint", testAppendValuesEndpoint),
-        ("testSheetRange", testSheetRange),
-        ("testBatchUpdateDSL", testBatchUpdateDSL),
-        ("testSheetRowMacro", testSheetRowMacro),
-        ("testTypeSafeUpdateValues", testTypeSafeUpdateValues),
-        ("testTypeSafeAppendValues", testTypeSafeAppendValues),
-        ("testCreateSpreadsheet", testCreateSpreadsheet),
-        ("testDeleteSpreadsheet", testDeleteSpreadsheet),
-        ("testListSpreadsheets", testListSpreadsheets),
-        ("testFormatting", testFormatting),
-        ("testClearValues", testClearValues),
-        ("testSort", testSort),
-        ("testCellAccess", testCellAccess),
-        ("testResize", testResize),
-        ("testDSLHelpers", testDSLHelpers),
-    ]
+
     
     func testCreateSpreadsheet() async throws {
         // ... (existing testCreateSpreadsheet code) ...
