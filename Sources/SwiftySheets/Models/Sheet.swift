@@ -163,11 +163,13 @@ public struct BatchUpdateRequest: Encodable {
         case updateCells(UpdateCellsRequest)
         case addSheet(AddSheetRequest)
         case deleteSheet(DeleteSheetRequest)
+        case repeatCell(RepeatCellRequest)
         
         enum CodingKeys: String, CodingKey {
             case updateCells
             case addSheet
             case deleteSheet
+            case repeatCell
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -179,6 +181,8 @@ public struct BatchUpdateRequest: Encodable {
                 try container.encode(request, forKey: .addSheet)
             case .deleteSheet(let request):
                 try container.encode(request, forKey: .deleteSheet)
+            case .repeatCell(let request):
+                try container.encode(request, forKey: .repeatCell)
             }
         }
     }
@@ -248,6 +252,18 @@ public struct DeleteSheetRequest: Codable {
     }
 }
 
+public struct RepeatCellRequest: Codable {
+    public let range: GridRange
+    public let cell: CellData
+    public let fields: String
+    
+    public init(range: GridRange, cell: CellData, fields: String) {
+        self.range = range
+        self.cell = cell
+        self.fields = fields
+    }
+}
+
 public struct GridRange: Codable {
     public let sheetId: Int?
     public let startRowIndex: Int?
@@ -274,9 +290,11 @@ public struct RowData: Codable {
 
 public struct CellData: Codable {
     public let userEnteredValue: ExtendedValue?
+    public let userEnteredFormat: CellFormat?
     
-    public init(userEnteredValue: ExtendedValue?) {
+    public init(userEnteredValue: ExtendedValue? = nil, userEnteredFormat: CellFormat? = nil) {
         self.userEnteredValue = userEnteredValue
+        self.userEnteredFormat = userEnteredFormat
     }
 }
 

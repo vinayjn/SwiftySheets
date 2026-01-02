@@ -157,4 +157,55 @@ public extension Spreadsheet {
             valueInputOption: valueInputOption
         )
     }
+    
+    func format(range: String, format: CellFormat) async throws {
+        let sheetRange = SheetRange(stringLiteral: range)
+        
+        // 1. Resolve Sheet ID
+        let sheetId: Int
+        if let name = sheetRange.sheetName {
+            sheetId = try sheet(named: name).properties.sheetId
+        } else {
+             guard let first = metadata.sheets.first else {
+                 throw SheetsError.spreadsheetNotFound(message: "No sheets found")
+             }
+             sheetId = first.properties.sheetId
+        }
+        
+        // 2. Resolve GridRange
+        let startRowIndex = sheetRange.startRow.map { $0 - 1 }
+        
+        var endRowIndex: Int? = sheetRange.endRow
+        if endRowIndex == nil, let start = startRowIndex {
+            // If start is defined but end is not (e.g. "A1"), it implies a single cell/row, so end = start + 1
+            // Unless it's an open range like "A1:". But my parser doesn't support "A1:" explicitly as distinct from A1 usually.
+            // "A1" -> startRow=1, endRow=nil. gridRange needs endRowIndex=1 for single row.
+            endRowIndex = start + 1
+        }
+        
+        let startColumnIndex = sheetRange.startColumn.map { SheetRange.columnToIndex($0) }
+        
+        var endColumnIndex: Int?
+        if let endColStr = sheetRange.endColumn {
+            endColumnIndex = SheetRange.columnToIndex(endColStr) + 1
+        } else if let start = startColumnIndex {
+             // If start col defined ("A1") but end is nil, imply single column.
+             endColumnIndex = start + 1
+        }
+        
+        let gridRange = GridRange(
+            sheetId: sheetId,
+            startRowIndex: startRowIndex,
+            endRowIndex: endRowIndex,
+            startColumnIndex: startColumnIndex,
+            endColumnIndex: endColumnIndex
+        )
+        
+        let cellData = CellData(userEnteredFormat: format)
+        let request = BatchUpdateRequest.Request.repeatCell(
+            RepeatCellRequest(range: gridRange, cell: cellData, fields: "userEnteredFormat")
+        )
+        
+        try await batchUpdate(requests: [request])
+    }
 }

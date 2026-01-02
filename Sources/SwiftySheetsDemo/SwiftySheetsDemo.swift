@@ -75,11 +75,20 @@ struct SwiftySheetsDemo {
                 values: [["Name", "Email", "Score"]]
             )
             
-            print("📖 [Raw] Reading headers back...")
-            let headers = try await spreadsheet.values(range: "DemoSheet!A1:C1")
-            print("   Headers: \(headers.first ?? [])")
-            
-            // 5. Type-Safe Write using Macros
+             print("📖 [Raw] Reading headers back...")
+             let headers = try await spreadsheet.values(range: "DemoSheet!A1:C1")
+             print("   Headers: \(headers.first ?? [])")
+             
+             // 4b. Format Header
+             print("🎨 Formatting header...")
+             let headerFormat = CellFormat(
+                 backgroundColor: .blue,
+                 textFormat: TextFormat(fgColor: .white, bold: true)
+             )
+             try await spreadsheet.format(range: "DemoSheet!A1:C1", format: headerFormat)
+             print("✅ Header formatted.")
+             
+             // 5. Type-Safe Write using Macros
             print("✍️ [Type-Safe] Writing user data...")
             let users = [
                 try DemoUser(row: ["Alice", "alice@test.com", "100"]),

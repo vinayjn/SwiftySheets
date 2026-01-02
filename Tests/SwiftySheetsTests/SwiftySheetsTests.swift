@@ -461,6 +461,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         ("testCreateSpreadsheet", testCreateSpreadsheet),
         ("testDeleteSpreadsheet", testDeleteSpreadsheet),
         ("testListSpreadsheets", testListSpreadsheets),
+        ("testFormatting", testFormatting),
     ]
     
     func testCreateSpreadsheet() async throws {
@@ -519,6 +520,27 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         let validFiles = try await client.listSpreadsheets()
         XCTAssertEqual(validFiles.count, 2)
         XCTAssertEqual(validFiles[0].name, "Sheet 1")
+    }
+    
+    func testFormatting() async throws {
+        // Mock metadata response for spreadsheet init (implicitly called by spreadsheet(id:))
+        setupMockSpreadsheetResponse()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        // BatchUpdate response
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = try JSONEncoder().encode(BatchUpdateResponse(spreadsheetId: TestConstants.spreadsheetID))
+        
+        let format = CellFormat(backgroundColor: .red)
+        try await spreadsheet.format(range: "Sheet1!A1", format: format)
+        
+        // We assume success if no error thrown and request structure is correct (which we can't fully inspect without a spy, but encoding is checked).
     }
 }
 

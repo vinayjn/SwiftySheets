@@ -57,6 +57,15 @@ public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByString
         }
     }
     
+    // Helper to convert "A" -> 0, "B" -> 1
+    public static func columnToIndex(_ column: String) -> Int {
+        var result = 0
+        for char in column.unicodeScalars {
+            result = result * 26 + Int(char.value) - Int(UnicodeScalar("A").value) + 1
+        }
+        return result - 1
+    }
+    
     private static func parseCell(_ cell: String) -> (col: String?, row: Int?) {
         // Separate letters and numbers
         let letters = cell.filter { $0.isLetter }
