@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol URLSessionProtocol {
+public protocol URLSessionProtocol: Sendable {
     func data(
         for request: URLRequest,
         delegate: (any URLSessionTaskDelegate)?
@@ -10,26 +10,33 @@ public protocol URLSessionProtocol {
 extension URLSession: URLSessionProtocol {}
 
 public final class Client {
-    private let credentials: GoogleCredentials
-    private let session: URLSessionProtocol
-
-    public init(
+    private let transport: Transport
+    
+    public init(transport: Transport) {
+        self.transport = transport
+    }
+    
+    public convenience init(
         credentials: GoogleCredentials,
-        session: URLSessionProtocol = URLSession(configuration: .default)
+        session: URLSessionProtocol = URLSession.shared
     ) {
-        self.credentials = credentials
-        self.session = session
+        self.init(transport: SheetsTransport(credentials: credentials, session: session))
     }
 
     func makeRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let authenticatedRequest = try await credentials.authenticate(request)
-        let (data, response) = try await session.data(for: authenticatedRequest, delegate: nil)
+        let (data, response) = try await transport.send(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SheetsError.invalidResponse(status: 500)
         }
         
         guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                print("❌ Authentication Failed. Request URL: \(httpResponse.url?.absoluteString ?? "nil")")
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("❌ Response Body: \(responseString)")
+                }
+            }
             try handleErrorResponse(data: data, statusCode: httpResponse.statusCode, headers: httpResponse.allHeaderFields)
         }
         
@@ -111,15 +118,24 @@ public extension Client {
         return try await makeRequest(request)
     }
     
+    @discardableResult
     func batchUpdate(
         spreadsheetId: String,
         requests: [BatchUpdateRequest.Request]
-    ) async throws {
+    ) async throws -> BatchUpdateResponse {
         let requestBody = BatchUpdateRequest(requests: requests)
         let bodyData = try JSONEncoder().encode(requestBody)
         let request = try Endpoint.batchUpdate(spreadsheetId: spreadsheetId).request(with: bodyData)
         
-        let _: EmptyResponse = try await makeRequest(request)
+        return try await makeRequest(request)
+    }
+    
+    @discardableResult
+    func batchUpdate(
+        spreadsheetId: String,
+        @BatchUpdateBuilder requests: @Sendable () -> [BatchUpdateRequest.Request]
+    ) async throws -> BatchUpdateResponse {
+        try await batchUpdate(spreadsheetId: spreadsheetId, requests: requests())
     }
 }
 

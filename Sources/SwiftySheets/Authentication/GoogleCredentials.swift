@@ -1,7 +1,7 @@
 import Foundation
 import OAuth2
 
-public protocol GoogleCredentials {
+public protocol GoogleCredentials: Sendable {
     func authenticate(_ request: URLRequest) async throws -> URLRequest
 }
 
@@ -15,7 +15,7 @@ public enum SpreadsheetScope {
     public static let readwrite = "https://www.googleapis.com/auth/spreadsheets"
 }
 
-public struct ServiceAccountCredentials: GoogleCredentials {
+public struct ServiceAccountCredentials: GoogleCredentials, @unchecked Sendable {
     private let credentials: ServiceAccountTokenProvider
 
     public init(

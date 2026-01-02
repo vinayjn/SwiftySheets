@@ -25,49 +25,40 @@ public enum Endpoint {
 
 extension Endpoint {
     func url() throws -> URL {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "sheets.googleapis.com"
+        
         switch self {
         case let .spreadsheet(id):
-            guard let url = URL(string: "\(Self.baseURL)/\(id)") else {
-                throw SheetsError.invalidRequest
-            }
-            return url
+            components.path = "/v4/spreadsheets/\(id)"
+            return try components.asURL()
 
         case let .values(id, range, valueRenderOption, dateTimeRenderOption):
-            var components = URLComponents(string: "\(Self.baseURL)/\(id)/values/\(range)")
-            components?.queryItems = [
+            components.path = "/v4/spreadsheets/\(id)/values/\(range)"
+            components.queryItems = [
                 URLQueryItem(name: "valueRenderOption", value: valueRenderOption),
                 URLQueryItem(name: "dateTimeRenderOption", value: dateTimeRenderOption),
             ]
-            guard let url = components?.url else {
-                throw SheetsError.invalidRequest
-            }
-            return url
+            return try components.asURL()
             
         case let .updateValues(id, range, valueInputOption):
-            var components = URLComponents(string: "\(Self.baseURL)/\(id)/values/\(range)")
-            components?.queryItems = [
+            components.path = "/v4/spreadsheets/\(id)/values/\(range)"
+            components.queryItems = [
                 URLQueryItem(name: "valueInputOption", value: valueInputOption)
             ]
-            guard let url = components?.url else {
-                throw SheetsError.invalidRequest
-            }
-            return url
+            return try components.asURL()
             
         case let .batchUpdate(id):
-            guard let url = URL(string: "\(Self.baseURL)/\(id):batchUpdate") else {
-                throw SheetsError.invalidRequest
-            }
-            return url
+            components.path = "/v4/spreadsheets/\(id):batchUpdate"
+            return try components.asURL()
             
         case let .appendValues(id, range, valueInputOption):
-            var components = URLComponents(string: "\(Self.baseURL)/\(id)/values/\(range):append")
-            components?.queryItems = [
+            components.path = "/v4/spreadsheets/\(id)/values/\(range):append"
+            components.queryItems = [
                 URLQueryItem(name: "valueInputOption", value: valueInputOption)
             ]
-            guard let url = components?.url else {
-                throw SheetsError.invalidRequest
-            }
-            return url
+            return try components.asURL()
         }
     }
 
@@ -78,8 +69,10 @@ extension Endpoint {
         switch self {
         case .spreadsheet, .values:
             request.httpMethod = "GET"
-        case .updateValues, .batchUpdate, .appendValues:
+        case .batchUpdate, .appendValues:
             request.httpMethod = "POST"
+        case .updateValues:
+            request.httpMethod = "PUT"
         }
 
         return request
@@ -89,5 +82,14 @@ extension Endpoint {
         var request = try self.request()
         request.httpBody = body
         return request
+    }
+}
+
+extension URLComponents {
+    func asURL() throws -> URL {
+        guard let url = self.url else {
+            throw SheetsError.invalidRequest
+        }
+        return url
     }
 }
