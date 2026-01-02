@@ -252,8 +252,9 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
             updatedColumns: 2,
             updatedCells: 4
         )
+        let appendResponse = AppendValuesResponse(spreadsheetId: "test-id", tableRange: "A1:B2", updates: updateResponse)
         mockSession.mockResponse = mockResponse
-        mockSession.mockData = try JSONEncoder().encode(updateResponse)
+        mockSession.mockData = try JSONEncoder().encode(appendResponse)
         
         let result = try await client.appendValues(
             spreadsheetId: "test-id",
@@ -426,8 +427,9 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         mockSession.queue(data: try JSONEncoder().encode(metadata))
         
         // 2. Queue Append Response
-        let updateResponse = UpdateValuesResponse(spreadsheetId: "id", updatedRange: "A1", updatedRows: 1, updatedColumns: 3, updatedCells: 3)
-        mockSession.queue(data: try JSONEncoder().encode(updateResponse))
+        let updates = UpdateValuesResponse(spreadsheetId: "id", updatedRange: "A1", updatedRows: 1, updatedColumns: 3, updatedCells: 3)
+        let appendResponse = AppendValuesResponse(spreadsheetId: "id", tableRange: "A1", updates: updates)
+        mockSession.queue(data: try JSONEncoder().encode(appendResponse))
         
         let users = [try TestUser(row: ["Bob", "b@c.com", "20"])]
         

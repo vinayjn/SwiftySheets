@@ -109,7 +109,8 @@ public extension Client {
             valueInputOption: valueInputOption.rawValue
         ).request(with: bodyData)
         
-        return try await makeRequest(request)
+        let response: AppendValuesResponse = try await makeRequest(request)
+        return response.updates
     }
     
     @discardableResult

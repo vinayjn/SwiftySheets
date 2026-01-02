@@ -150,6 +150,12 @@ public struct UpdateValuesResponse: Codable {
     public let updatedCells: Int
 }
 
+public struct AppendValuesResponse: Codable {
+    public let spreadsheetId: String
+    public let tableRange: String?
+    public let updates: UpdateValuesResponse
+}
+
 public struct BatchUpdateRequest: Encodable {
     public let requests: [Request]
     
