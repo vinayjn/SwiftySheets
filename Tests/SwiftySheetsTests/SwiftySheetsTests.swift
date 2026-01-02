@@ -2,9 +2,9 @@
 import XCTest
 import Foundation
 
-enum TestContstants {
-    static let jsonPath = ProcessInfo.processInfo.environment["SWIFTYSHEETS_SERVICE_ACCOUNT_PATH"] ?? ""
-    static let spreadsheetID = ProcessInfo.processInfo.environment["SWIFTYSHEETS_SPREADSHEET_ID"] ?? ""
+enum TestConstants {
+    static let jsonPath = "/dummy/path/service_account.json"
+    static let spreadsheetID = "test-spreadsheet-id"
 }
 
 final class MockURLSession: URLSessionProtocol, @unchecked Sendable {
@@ -46,7 +46,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
 
     func testSpreadsheetWithID() async throws {
         setupMockSpreadsheetResponse()
-        let spreadsheet = try await client.spreadsheet(id: TestContstants.spreadsheetID)
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
         
         // Mock response for values call
         let mockValueRange = ValueRange(range: "A11", values: [["Liquid Cash"]])
@@ -58,21 +58,21 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
 
     func testAllSheetsInSpreadsheet() async throws {
         setupMockSpreadsheetResponse()
-        let spreadsheet = try await client.spreadsheet(id: TestContstants.spreadsheetID)
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
         let sheets = try spreadsheet.sheets()
         XCTAssert(sheets.count > 0)
     }
 
     func testNamedSheetInSpreadsheet() async throws {
         setupMockSpreadsheetResponse()
-        let spreadsheet = try await client.spreadsheet(id: TestContstants.spreadsheetID)
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
         let sheet = try spreadsheet.sheet(named: "Sheet1")
         XCTAssertNotNil(sheet)
     }
     
     private func setupMockSpreadsheetResponse() {
         let metadata = Spreadsheet.Metadata(
-            spreadsheetId: TestContstants.spreadsheetID,
+            spreadsheetId: TestConstants.spreadsheetID,
             properties: Spreadsheet.Metadata.Properties(title: "Test Sheet"),
             sheets: [
                 Sheet(properties: Sheet.SheetProperties(sheetId: 0, title: "Sheet1", index: 0, gridProperties: Sheet.GridProperties(rowCount: 100, columnCount: 20)))
