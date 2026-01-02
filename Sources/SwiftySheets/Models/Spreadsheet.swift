@@ -1,19 +1,19 @@
 import Foundation
 
 public struct Spreadsheet {
-    public struct Metadata: Decodable {
+    public struct Metadata: Codable {
         public let spreadsheetId: String
         public let properties: Properties
         public let sheets: [Sheet]
 
-        public struct Properties: Decodable {
+        public struct Properties: Codable {
             public let title: String
         }
     }
 
     private let client: Client
     private let id: String
-    private var metadata: Metadata
+    public private(set) var metadata: Metadata
 
     init(client: Client, id: String) async throws {
         self.client = client
@@ -92,23 +92,36 @@ public extension Spreadsheet {
         )
     }
     
-    func batchUpdate(requests: [BatchUpdateRequest.Request]) async throws {
-        try await client.batchUpdate(spreadsheetId: id, requests: requests)
+    @discardableResult
+    func batchUpdate(requests: [BatchUpdateRequest.Request]) async throws -> BatchUpdateResponse {
+        return try await client.batchUpdate(spreadsheetId: id, requests: requests)
     }
     
     func addSheet(title: String, rowCount: Int = 1000, columnCount: Int = 26) async throws {
-        let properties = Sheet.SheetProperties(
-            sheetId: 0,
+        let properties = Sheet.Draft(
             title: title,
-            index: 0,
             gridProperties: Sheet.GridProperties(rowCount: rowCount, columnCount: columnCount)
         )
         let request = BatchUpdateRequest.Request.addSheet(AddSheetRequest(properties: properties))
         try await batchUpdate(requests: [request])
     }
     
-    func deleteSheet(sheetId: Int) async throws {
-        let request = BatchUpdateRequest.Request.deleteSheet(DeleteSheetRequest(sheetId: sheetId))
-        try await batchUpdate(requests: [request])
+    func values<T: SheetRowDecodable>(
+        range: String,
+        type: T.Type,
+        valueRenderOption: ValueRenderOption = .unformatted,
+        dateTimeRenderOption: DateRenderOption = .serialNumber
+    ) async throws -> [T] {
+        let rawValues = try await values(
+            range: range,
+            valueRenderOption: valueRenderOption,
+            dateTimeRenderOption: dateTimeRenderOption
+        )
+        return try rawValues.map { try T(row: $0) }
+    }
+
+    @discardableResult
+    func batchUpdate(@BatchUpdateBuilder _ builder: @Sendable () -> [BatchUpdateRequest.Request]) async throws -> BatchUpdateResponse {
+        try await batchUpdate(requests: builder())
     }
 }

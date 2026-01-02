@@ -17,12 +17,63 @@ public enum DateRenderOption: String {
 struct ValueRange: Codable {
     let range: String
     let values: [[String]]
+    
+    enum CodingKeys: String, CodingKey {
+        case range
+        case values
+    }
+    
+    init(range: String, values: [[String]]) {
+        self.range = range
+        self.values = values
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.range = try container.decode(String.self, forKey: .range)
+        
+        // Decode as [[SafeString]] to handle mixed types
+        if let safeValues = try? container.decode([[SafeString]].self, forKey: .values) {
+            self.values = safeValues.map { $0.map { $0.value } }
+        } else {
+            self.values = []
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(range, forKey: .range)
+        try container.encode(values, forKey: .values)
+    }
 }
 
-public struct Sheet: Decodable {
+// Helper to decode String, Int, Double, Bool into a String
+private struct SafeString: Decodable {
+    let value: String
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let stringValue = try? container.decode(String.self) {
+            self.value = stringValue
+        } else if let intValue = try? container.decode(Int.self) {
+            self.value = String(intValue)
+        } else if let doubleValue = try? container.decode(Double.self) {
+            self.value = String(doubleValue)
+        } else if let boolValue = try? container.decode(Bool.self) {
+            self.value = String(boolValue)
+        } else {
+             // Fallback or throw? Let's use empty string or description if needed, strictly speaking if it's null it might end here.
+             // If we really can't decode, let's treat it as empty or fallback.
+             // Given Google sheets, usually keys are just these primitives.
+             self.value = ""
+        }
+    }
+}
+
+public struct Sheet: Codable, Sendable {
     public let properties: SheetProperties
 
-    public struct SheetProperties: Codable {
+    public struct SheetProperties: Codable, Sendable {
         public let sheetId: Int
         public let title: String
         public let index: Int
@@ -43,7 +94,7 @@ public struct Sheet: Decodable {
         }
     }
 
-    public struct GridProperties: Codable {
+    public struct GridProperties: Codable, Sendable {
         public let rowCount: Int
         public let columnCount: Int
         
@@ -51,6 +102,20 @@ public struct Sheet: Decodable {
             self.rowCount = rowCount
             self.columnCount = columnCount
         }
+    }
+    
+    public struct Draft: Encodable {
+        public let title: String
+        public let gridProperties: GridProperties?
+        
+        public init(title: String, gridProperties: GridProperties? = nil) {
+            self.title = title
+            self.gridProperties = gridProperties
+        }
+        
+        // This ensures it encodes to "properties" key if nested,
+        // but AddSheetRequest expects { properties: { title: ... } }
+        // So Draft should look like SheetProperties when encoded but without ID.
     }
 }
 
@@ -85,10 +150,10 @@ public struct UpdateValuesResponse: Codable {
     public let updatedCells: Int
 }
 
-public struct BatchUpdateRequest: Codable {
+public struct BatchUpdateRequest: Encodable {
     public let requests: [Request]
     
-    public enum Request: Codable {
+    public enum Request: Encodable {
         case updateCells(UpdateCellsRequest)
         case addSheet(AddSheetRequest)
         case deleteSheet(DeleteSheetRequest)
@@ -110,19 +175,31 @@ public struct BatchUpdateRequest: Codable {
                 try container.encode(request, forKey: .deleteSheet)
             }
         }
+    }
+    
+    // Needed for init
+    public init(requests: [Request]) {
+        self.requests = requests
+    }
+}
+
+public struct BatchUpdateResponse: Codable {
+    public let spreadsheetId: String
+    public let replies: [Reply]?
+    
+    public struct Reply: Codable {
+        public let addSheet: AddSheetResponse?
+        // Other replies can be added here
         
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            if let updateCells = try? container.decode(UpdateCellsRequest.self, forKey: .updateCells) {
-                self = .updateCells(updateCells)
-            } else if let addSheet = try? container.decode(AddSheetRequest.self, forKey: .addSheet) {
-                self = .addSheet(addSheet)
-            } else if let deleteSheet = try? container.decode(DeleteSheetRequest.self, forKey: .deleteSheet) {
-                self = .deleteSheet(deleteSheet)
-            } else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown request type"))
-            }
+        // Make memberwise init if needed or rely on Codable synthesis for tests
+        public init(addSheet: AddSheetResponse? = nil) {
+            self.addSheet = addSheet
         }
+    }
+    
+    public init(spreadsheetId: String, replies: [Reply]? = nil) {
+        self.spreadsheetId = spreadsheetId
+        self.replies = replies
     }
 }
 
@@ -138,7 +215,18 @@ public struct UpdateCellsRequest: Codable {
     }
 }
 
-public struct AddSheetRequest: Codable {
+public struct AddSheetRequest: Encodable {
+    public let properties: Sheet.Draft
+    
+    public init(properties: Sheet.Draft) {
+        self.properties = properties
+    }
+    
+    // Decoding support if needed (for responses), but AddSheetRequest is usually just sent.
+    // The response is AddSheetResponse which contains 'properties' of type SheetProperties (with ID).
+}
+
+public struct AddSheetResponse: Codable {
     public let properties: Sheet.SheetProperties
     
     public init(properties: Sheet.SheetProperties) {
