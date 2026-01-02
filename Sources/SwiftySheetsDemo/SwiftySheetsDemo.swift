@@ -68,6 +68,9 @@ struct SwiftySheetsDemo {
             }
             print("✅ Sheet added with ID: \(sheetId)")
             
+            // Refresh metadata to ensure the new sheet is known for subsequent lookups (like format)
+            try await spreadsheet.refreshMetadata()
+            
             // 4. Raw Data Operations (Non-Type Safe)
             print("📝 [Raw] Writing header row...")
             _ = try await spreadsheet.updateValues(
@@ -83,7 +86,7 @@ struct SwiftySheetsDemo {
              print("🎨 Formatting header...")
              let headerFormat = CellFormat(
                  backgroundColor: .blue,
-                 textFormat: TextFormat(fgColor: .white, bold: true)
+                 textFormat: TextFormat(foregroundColor: .white, bold: true)
              )
              try await spreadsheet.format(range: "DemoSheet!A1:C1", format: headerFormat)
              print("✅ Header formatted.")

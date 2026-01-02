@@ -28,7 +28,7 @@ public enum HorizontalAlignment: String, Codable, Sendable {
 }
 
 public struct TextFormat: Codable, Equatable, Sendable {
-    public var fgColor: Color?
+    public var foregroundColor: Color?
     public var fontFamily: String?
     public var fontSize: Int?
     public var bold: Bool?
@@ -37,7 +37,7 @@ public struct TextFormat: Codable, Equatable, Sendable {
     public var underline: Bool?
     
     public init(
-        fgColor: Color? = nil,
+        foregroundColor: Color? = nil,
         fontFamily: String? = nil,
         fontSize: Int? = nil,
         bold: Bool? = nil,
@@ -45,7 +45,7 @@ public struct TextFormat: Codable, Equatable, Sendable {
         strikethrough: Bool? = nil,
         underline: Bool? = nil
     ) {
-        self.fgColor = fgColor
+        self.foregroundColor = foregroundColor
         self.fontFamily = fontFamily
         self.fontSize = fontSize
         self.bold = bold
