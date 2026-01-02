@@ -203,7 +203,11 @@ public extension Spreadsheet {
             // If start is defined but end is not (e.g. "A1"), it implies a single cell/row, so end = start + 1
             // Unless it's an open range like "A1:". But my parser doesn't support "A1:" explicitly as distinct from A1 usually.
             // "A1" -> startRow=1, endRow=nil. gridRange needs endRowIndex=1 for single row.
-            endRowIndex = start + 1
+            
+            // Fix: Only apply this if endColumn is ALSO nil. If endColumn is present (e.g. "A2:C"), it means "A2 to C (unbounded rows)".
+            if sheetRange.endColumn == nil {
+                endRowIndex = start + 1
+            }
         }
         
         let startColumnIndex = sheetRange.startColumn.map { SheetRange.columnToIndex($0) }
