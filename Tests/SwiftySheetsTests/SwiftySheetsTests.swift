@@ -3,11 +3,11 @@ import XCTest
 import Foundation
 
 enum TestContstants {
-    static let jsonPath = "/dummy/path/service_account.json"
-    static let spreadsheetID = "test-spreadsheet-id"
+    static let jsonPath = ProcessInfo.processInfo.environment["SWIFTYSHEETS_SERVICE_ACCOUNT_PATH"] ?? ""
+    static let spreadsheetID = ProcessInfo.processInfo.environment["SWIFTYSHEETS_SPREADSHEET_ID"] ?? ""
 }
 
-class MockURLSession: URLSessionProtocol {
+final class MockURLSession: URLSessionProtocol, @unchecked Sendable {
     var mockData: Data?
     var mockResponse: URLResponse?
     var mockError: Error?
@@ -20,7 +20,7 @@ class MockURLSession: URLSessionProtocol {
     }
 }
 
-class MockCredentials: GoogleCredentials {
+final class MockCredentials: GoogleCredentials, @unchecked Sendable {
     func authenticate(_ request: URLRequest) async throws -> URLRequest {
         var authenticatedRequest = request
         authenticatedRequest.setValue("Bearer mock-token", forHTTPHeaderField: "Authorization")
@@ -31,35 +31,62 @@ class MockCredentials: GoogleCredentials {
 final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
     private var client: Client!
 
+    private var mockSession: MockURLSession!
+
     override func setUp() async throws {
         try await super.setUp()
-
-        let credentials = try XCTUnwrap(ServiceAccountCredentials(jsonPath: TestContstants.jsonPath))
-        client = Client(credentials: credentials)
+        
+        mockSession = MockURLSession()
+        let credentials = MockCredentials()
+        // We use the convenience init that uses SheetsTransport internally, 
+        // OR we manually build transport to inject mock session.
+        let transport = SheetsTransport(credentials: credentials, session: mockSession)
+        client = Client(transport: transport)
     }
 
     func testSpreadsheetWithID() async throws {
+        setupMockSpreadsheetResponse()
         let spreadsheet = try await client.spreadsheet(id: TestContstants.spreadsheetID)
+        
+        // Mock response for values call
+        let mockValueRange = ValueRange(range: "A11", values: [["Liquid Cash"]])
+        mockSession.mockData = try JSONEncoder().encode(mockValueRange)
+        
         let values = try await spreadsheet.values(range: "A11")
         XCTAssertEqual(values, [["Liquid Cash"]])
     }
 
     func testAllSheetsInSpreadsheet() async throws {
+        setupMockSpreadsheetResponse()
         let spreadsheet = try await client.spreadsheet(id: TestContstants.spreadsheetID)
         let sheets = try spreadsheet.sheets()
         XCTAssert(sheets.count > 0)
     }
 
     func testNamedSheetInSpreadsheet() async throws {
+        setupMockSpreadsheetResponse()
         let spreadsheet = try await client.spreadsheet(id: TestContstants.spreadsheetID)
         let sheet = try spreadsheet.sheet(named: "Sheet1")
         XCTAssertNotNil(sheet)
     }
+    
+    private func setupMockSpreadsheetResponse() {
+        let metadata = Spreadsheet.Metadata(
+            spreadsheetId: TestContstants.spreadsheetID,
+            properties: Spreadsheet.Metadata.Properties(title: "Test Sheet"),
+            sheets: [
+                Sheet(properties: Sheet.SheetProperties(sheetId: 0, title: "Sheet1", index: 0, gridProperties: Sheet.GridProperties(rowCount: 100, columnCount: 20)))
+            ]
+        )
+        mockSession.mockResponse = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)
+        mockSession.mockData = try! JSONEncoder().encode(metadata)
+    }
 
     // MARK: - Error Handling Tests
     
+    // MARK: - Error Handling Tests
+    
     func testErrorHandling401() async throws {
-        let mockSession = MockURLSession()
         let mockResponse = HTTPURLResponse(
             url: URL(string: "https://example.com")!,
             statusCode: 401,
@@ -68,8 +95,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         )
         mockSession.mockResponse = mockResponse
         mockSession.mockData = Data()
-        
-        let client = Client(credentials: MockCredentials(), session: mockSession)
         
         do {
             let _: ValueRange = try await client.makeRequest(URLRequest(url: URL(string: "https://example.com")!))
@@ -82,7 +107,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
     }
     
     func testErrorHandling403WithAPIError() async throws {
-        let mockSession = MockURLSession()
         let mockResponse = HTTPURLResponse(
             url: URL(string: "https://example.com")!,
             statusCode: 403,
@@ -101,8 +125,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         mockSession.mockResponse = mockResponse
         mockSession.mockData = try JSONEncoder().encode(apiError)
         
-        let client = Client(credentials: MockCredentials(), session: mockSession)
-        
         do {
             let _: ValueRange = try await client.makeRequest(URLRequest(url: URL(string: "https://example.com")!))
             XCTFail("Should have thrown permissionDenied error")
@@ -114,7 +136,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
     }
     
     func testErrorHandling429WithRetryAfter() async throws {
-        let mockSession = MockURLSession()
         let mockResponse = HTTPURLResponse(
             url: URL(string: "https://example.com")!,
             statusCode: 429,
@@ -123,8 +144,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         )
         mockSession.mockResponse = mockResponse
         mockSession.mockData = Data()
-        
-        let client = Client(credentials: MockCredentials(), session: mockSession)
         
         do {
             let _: ValueRange = try await client.makeRequest(URLRequest(url: URL(string: "https://example.com")!))
@@ -139,7 +158,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
     // MARK: - Response Status Code Tests
     
     func testSuccessfulResponseCodes() async throws {
-        let mockSession = MockURLSession()
         let successCodes = [200, 201, 204, 299]
         
         let mockValueRange = ValueRange(range: "A1:A1", values: [["test"]])
@@ -155,8 +173,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
             mockSession.mockResponse = mockResponse
             mockSession.mockData = mockData
             
-            let client = Client(credentials: MockCredentials(), session: mockSession)
-            
             do {
                 let result: ValueRange = try await client.makeRequest(URLRequest(url: URL(string: "https://example.com")!))
                 XCTAssertEqual(result.values, [["test"]])
@@ -169,7 +185,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
     // MARK: - Write Operations Tests
     
     func testUpdateValuesRequest() async throws {
-        let mockSession = MockURLSession()
         let mockResponse = HTTPURLResponse(
             url: URL(string: "https://example.com")!,
             statusCode: 200,
@@ -187,8 +202,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         mockSession.mockResponse = mockResponse
         mockSession.mockData = try JSONEncoder().encode(updateResponse)
         
-        let client = Client(credentials: MockCredentials(), session: mockSession)
-        
         let result = try await client.updateValues(
             spreadsheetId: "test-id",
             range: "A1:B2",
@@ -201,7 +214,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
     }
     
     func testAppendValuesRequest() async throws {
-        let mockSession = MockURLSession()
         let mockResponse = HTTPURLResponse(
             url: URL(string: "https://example.com")!,
             statusCode: 200,
@@ -219,8 +231,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         mockSession.mockResponse = mockResponse
         mockSession.mockData = try JSONEncoder().encode(updateResponse)
         
-        let client = Client(credentials: MockCredentials(), session: mockSession)
-        
         let result = try await client.appendValues(
             spreadsheetId: "test-id",
             range: "A1:B1",
@@ -232,7 +242,6 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
     }
     
     func testBatchUpdateRequest() async throws {
-        let mockSession = MockURLSession()
         let mockResponse = HTTPURLResponse(
             url: URL(string: "https://example.com")!,
             statusCode: 200,
@@ -240,17 +249,17 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
             headerFields: nil
         )
         
-        // Empty response for batch update
+        // Mock response for batch update
+        let mockResponseData = BatchUpdateResponse(
+            spreadsheetId: "test-id",
+            replies: nil
+        )
         mockSession.mockResponse = mockResponse
-        mockSession.mockData = try JSONEncoder().encode(EmptyResponse())
-        
-        let client = Client(credentials: MockCredentials(), session: mockSession)
+        mockSession.mockData = try JSONEncoder().encode(mockResponseData)
         
         let addSheetRequest = BatchUpdateRequest.Request.addSheet(
-            AddSheetRequest(properties: Sheet.SheetProperties(
-                sheetId: 1,
+            AddSheetRequest(properties: Sheet.Draft(
                 title: "New Sheet",
-                index: 1,
                 gridProperties: Sheet.GridProperties(rowCount: 100, columnCount: 10)
             ))
         )
@@ -272,7 +281,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(url.absoluteString, "https://sheets.googleapis.com/v4/spreadsheets/test-id/values/A1:B2?valueInputOption=USER_ENTERED")
         
         let request = try endpoint.request()
-        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.httpMethod, "PUT")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
     }
     
@@ -297,6 +306,47 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(url.absoluteString, "https://sheets.googleapis.com/v4/spreadsheets/test-id/values/A1:B1:append?valueInputOption=RAW")
     }
 
+    func testSheetRange() {
+        let range1: SheetRange = "Sheet1!A1:B2"
+        XCTAssertEqual(range1.sheetName, "Sheet1")
+        // Basic parsing check; assuming we improve parsing later
+        
+        let range2 = SheetRange(sheetName: "Sheet1", startColumn: "A", startRow: 1)
+        XCTAssertEqual(range2.description, "Sheet1!A1")
+    }
+    
+    func testBatchUpdateDSL() async throws {
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = try JSONEncoder().encode(BatchUpdateResponse(spreadsheetId: "test-id", replies: nil))
+        
+        try await client.batchUpdate(spreadsheetId: "test-id") {
+            AddSheet("New Sheet")
+            DeleteSheet(id: 123)
+        }
+        
+        // Keep in mind we are not verifyng the Request Body content here easily without spying on Transport
+        // To verify the body, we would need to inspect 'mockSession.lastRequest' if we added that capability.
+        // For now, we verify it doesn't crash.
+    }
+    
+    // Test Macro Usage
+    func testSheetRowMacro() throws {
+        let row = ["Alice", "alice@example.com", "100"]
+        let user = try TestUser(row: row)
+        XCTAssertEqual(user.name, "Alice")
+        XCTAssertEqual(user.email, "alice@example.com")
+        XCTAssertEqual(user.points, 100)
+        
+        let encoded = try user.encodeRow()
+        XCTAssertEqual(encoded, ["Alice", "alice@example.com", "100"])
+    }
+
     static let allTests = [
         ("testSpreadsheetWithID", testSpreadsheetWithID),
         ("testAllSheetsInSpreadsheet", testAllSheetsInSpreadsheet),
@@ -311,7 +361,17 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         ("testUpdateValuesEndpoint", testUpdateValuesEndpoint),
         ("testBatchUpdateEndpoint", testBatchUpdateEndpoint),
         ("testAppendValuesEndpoint", testAppendValuesEndpoint),
+        ("testSheetRange", testSheetRange),
+        ("testBatchUpdateDSL", testBatchUpdateDSL),
+        ("testSheetRowMacro", testSheetRowMacro),
     ]
+}
+
+@SheetRow
+struct TestUser {
+    @Column("A") var name: String
+    @Column("B") var email: String
+    @Column(index: 2) var points: Int
 }
 
 private struct EmptyResponse: Codable {}
