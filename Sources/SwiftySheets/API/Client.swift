@@ -31,12 +31,6 @@ public final class Client {
         }
         
         guard (200...299).contains(httpResponse.statusCode) else {
-            if httpResponse.statusCode == 401 {
-                print("❌ Authentication Failed. Request URL: \(httpResponse.url?.absoluteString ?? "nil")")
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("❌ Response Body: \(responseString)")
-                }
-            }
             try handleErrorResponse(data: data, statusCode: httpResponse.statusCode, headers: httpResponse.allHeaderFields)
         }
         

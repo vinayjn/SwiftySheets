@@ -22,19 +22,50 @@ public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByString
     }
     
     public init(stringLiteral value: String) {
-        // Simple parser for "Sheet1!A1:B2" format
-        // This is a basic implementation, can be improved with Regex
+        // Format: Sheet1!A1:B2 or A1:B2 or Sheet1!A1
         let parts = value.components(separatedBy: "!")
+        
+        var rangePart = value
         if parts.count == 2 {
             self.sheetName = parts[0]
-            // Parse A1:B2 part...
-            // For now, storing as raw string if needed or just minimal support
-            // This init is for ExpressibleByStringLiteral, we might need to parse fully
-             // TODO: robust parsing
-             self.startColumn = nil; self.startRow = nil; self.endColumn = nil; self.endRow = nil
+            rangePart = parts[1]
         } else {
-             self.sheetName = nil; self.startColumn = nil; self.startRow = nil; self.endColumn = nil; self.endRow = nil
+            self.sheetName = nil
         }
+        
+        // Parse range: A1:B2
+        let rangeParts = rangePart.components(separatedBy: ":")
+        if rangeParts.count == 2 {
+            // Start and End
+            let start = Self.parseCell(rangeParts[0])
+            let end = Self.parseCell(rangeParts[1])
+            
+            self.startColumn = start.col
+            self.startRow = start.row
+            self.endColumn = end.col
+            self.endRow = end.row
+        } else if rangeParts.count == 1 {
+            // Just Start
+            let start = Self.parseCell(rangeParts[0])
+            self.startColumn = start.col
+            self.startRow = start.row
+            self.endColumn = nil
+            self.endRow = nil
+        } else {
+            self.startColumn = nil; self.startRow = nil
+            self.endColumn = nil; self.endRow = nil
+        }
+    }
+    
+    private static func parseCell(_ cell: String) -> (col: String?, row: Int?) {
+        // Separate letters and numbers
+        let letters = cell.filter { $0.isLetter }
+        let numbers = cell.filter { $0.isNumber }
+        
+        let col = letters.isEmpty ? nil : String(letters)
+        let row = Int(numbers)
+        
+        return (col, row)
     }
     
     public var description: String {
