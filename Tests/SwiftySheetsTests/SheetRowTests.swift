@@ -49,7 +49,44 @@ final class SheetRowTests: XCTestCase {
         XCTAssertEqual(encoded[5], "99")
     }
     
-    // MARK: - Nesting Test (Expectation: Not Supported or Flat?)
-    // While the user asked if it is supported, we know it will verify false currently.
-    // So we won't add a failing test for it unless we plan to implement it.
+    // MARK: - Date Types Tests
+    
+    @SheetRow
+    struct DateRow: SheetRowCodable, Equatable {
+        @Column("A") var isoDate: Date
+        @Column("B", format: "yyyy-MM-dd") var customDate: Date
+        @Column("C") var optionalDate: Date?
+    }
+    
+    func testDateTypes() throws {
+        let isoStr = "2023-01-01T10:00:00Z"
+        let customStr = "2023-12-31"
+        let row = [isoStr, customStr, ""]
+        
+        let obj = try DateRow(row: row)
+        
+        // Verify ISO
+        let isoFormatter = ISO8601DateFormatter()
+        XCTAssertEqual(obj.isoDate, isoFormatter.date(from: isoStr))
+        
+        // Verify Custom
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        // formatter.timeZone = TimeZone(identifier: "UTC") // Macro uses default timezone? 
+        // Note: DateFormatter default timezone is local. 
+        // The macro generated code: `let f = DateFormatter(); f.dateFormat = ...`
+        // So both test and macro use system local time. Should match.
+        
+        // We need to be careful about matching exact dates if time components differ due to defaults.
+        // But since we parse the same string with same formatter config (default), it should be equal.
+        let expectedDate = formatter.date(from: customStr)
+        XCTAssertEqual(obj.customDate, expectedDate)
+        
+        XCTAssertNil(obj.optionalDate)
+        
+        // Test Encoding
+        let encoded = try obj.encodeRow()
+        XCTAssertEqual(encoded[0], isoStr)
+        XCTAssertEqual(encoded[1], customStr)
+    }
 }

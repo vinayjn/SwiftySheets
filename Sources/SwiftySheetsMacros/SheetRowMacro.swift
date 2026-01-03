@@ -9,6 +9,7 @@ public struct SheetRowMacro: MemberMacro {
         let name: String
         let type: String
         let columnIndex: Int
+        let dateFormat: String?
     }
     
     public static func expansion(
@@ -34,21 +35,38 @@ public struct SheetRowMacro: MemberMacro {
             }
             
             // Check for @Column attribute
-            let columnIndex: Int
+            var columnIndex: Int = 0
+            var dateFormat: String? = nil
+            
             if let attribute = property.attributes.first(where: {
                 $0.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == "Column"
             }), let args = attribute.as(AttributeSyntax.self)?.arguments?.as(LabeledExprListSyntax.self) {
-                 if let stringLiteral = args.first?.expression.as(StringLiteralExprSyntax.self)?.segments.first?.as(StringSegmentSyntax.self)?.content.text {
-                    columnIndex = columnLetterToIndex(stringLiteral)
-                } else if let intLiteral = args.first?.expression.as(IntegerLiteralExprSyntax.self)?.literal.text {
-                    columnIndex = Int(intLiteral) ?? 0
-                } else {
-                    columnIndex = 0
+                 
+                // Iterate arguments to find index/name and format
+                for arg in args {
+                    if let label = arg.label?.text {
+                        if label == "index" {
+                             if let val = arg.expression.as(IntegerLiteralExprSyntax.self)?.literal.text {
+                                columnIndex = Int(val) ?? 0
+                            }
+                        } else if label == "format" {
+                            if let val = arg.expression.as(StringLiteralExprSyntax.self)?.segments.first?.as(StringSegmentSyntax.self)?.content.text {
+                                dateFormat = val
+                            }
+                        }
+                    } else {
+                        // Unlabeled argument -> name string or index?
+                        if let stringLiteral = arg.expression.as(StringLiteralExprSyntax.self)?.segments.first?.as(StringSegmentSyntax.self)?.content.text {
+                            columnIndex = columnLetterToIndex(stringLiteral)
+                        } else if let intLiteral = arg.expression.as(IntegerLiteralExprSyntax.self)?.literal.text {
+                            columnIndex = Int(intLiteral) ?? 0
+                        }
+                    }
                 }
             } else {
                 continue
             }
-            props.append(PropInfo(name: name, type: type, columnIndex: columnIndex))
+            props.append(PropInfo(name: name, type: type, columnIndex: columnIndex, dateFormat: dateFormat))
         }
         
         // 1. Generate init(row: [String])
@@ -60,7 +78,6 @@ public struct SheetRowMacro: MemberMacro {
             let cleanType = isOptional ? String(type.dropLast()) : type
             
             let safeRead = "row.count > \(col) ? row[\(col)] : \"\""
-            
             let rawVar = "raw_\(p.name)"
             
             // Conversion logic
@@ -89,6 +106,29 @@ public struct SheetRowMacro: MemberMacro {
                     conversion = "let \(rawVar) = \(safeRead); self.\(p.name) = \(rawVar).isEmpty ? nil : ((\(rawVar)).lowercased() == \"true\")"
                 } else {
                     conversion = "self.\(p.name) = \(boolParse)"
+                }
+            } else if cleanType == "Date" {
+                 // Date Handling
+                var parser = ""
+                if let format = p.dateFormat {
+                    parser = """
+                    {
+                        let f = DateFormatter()
+                        f.dateFormat = "\(format)"
+                        return f.date(from: \(safeRead))
+                    }()
+                    """
+                } else {
+                    // ISO8601 Default
+                    parser = "ISO8601DateFormatter().date(from: \(safeRead))"
+                }
+                
+                if isOptional {
+                    // Note: invalid date parse -> nil. Empty string -> nil.
+                    conversion = "let \(rawVar) = \(safeRead); self.\(p.name) = \(rawVar).isEmpty ? nil : \(parser)"
+                } else {
+                    // Force unwrap or default? Default to Date() (current)
+                    conversion = "self.\(p.name) = \(parser) ?? Date()"
                 }
             } else {
                  if isOptional {
@@ -137,6 +177,26 @@ public struct SheetRowMacro: MemberMacro {
                     encodeExpr = "self.\(p.name).map { $0 ? \"TRUE\" : \"FALSE\" } ?? \"\""
                 } else {
                     encodeExpr = "(self.\(p.name) ? \"TRUE\" : \"FALSE\")"
+                }
+            } else if cleanType == "Date" {
+                 // Date encoding
+                var formatter = ""
+                if let format = p.dateFormat {
+                    formatter = """
+                    {
+                        let f = DateFormatter()
+                        f.dateFormat = "\(format)"
+                        return f.string(from: val)
+                    }()
+                    """
+                } else {
+                    formatter = "ISO8601DateFormatter().string(from: val)"
+                }
+                
+                if isOptional {
+                    encodeExpr = "self.\(p.name).map { val in \(formatter) } ?? \"\""
+                } else {
+                    encodeExpr = "{ let val = self.\(p.name); return \(formatter) }()"
                 }
             } else {
                 encodeExpr = "\"\""
