@@ -3,7 +3,27 @@ import SwiftSyntaxMacros
 import SwiftSyntaxBuilder
 import SwiftDiagnostics
 
-public struct SheetRowMacro: MemberMacro {
+public struct SheetRowMacro: MemberMacro, ExtensionMacro {
+    
+    public static func expansion(
+        of node: AttributeSyntax,
+        attachedTo declaration: some DeclGroupSyntax,
+        providingExtensionsOf type: some TypeSyntaxProtocol,
+        conformingTo protocols: [TypeSyntax],
+        in context: some MacroExpansionContext
+    ) throws -> [ExtensionDeclSyntax] {
+        // Return extension with conformances
+        // We know we want SheetRowCodable, Equatable, Hashable
+        // But users might strictly want only what they asked for?
+        // The macro definition explicitly lists them, so we should provide them.
+        
+        // We can generate one extension for all or separate.
+        // Let's generate one.
+        // extension <Type>: SheetRowCodable, Equatable, Hashable {}
+        
+        let decl: ExtensionDeclSyntax = try ExtensionDeclSyntax("extension \(type.trimmed): SheetRowCodable, Equatable, Hashable {}")
+        return [decl]
+    }
     
     struct PropInfo {
         let name: String

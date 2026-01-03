@@ -51,6 +51,8 @@ struct User {
 }
 ```
 
+The `@SheetRow` macro automatically adds conformance to `SheetRowCodable`, `Equatable`, and `Hashable`.
+
 ### 4. Read Data
 
 ```swift

@@ -625,7 +625,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
 }
 
 @SheetRow
-struct TestUser: SheetRowCodable, Equatable {
+struct TestUser {
     @Column("A") var name: String
     @Column("B") var email: String
     @Column(index: 2) var points: Int

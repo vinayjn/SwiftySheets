@@ -2,7 +2,7 @@ import Foundation
 import SwiftySheets
 
 @SheetRow
-struct DemoUser: SheetRowCodable {
+struct DemoUser {
     @Column("A") var name: String
     @Column("B") var email: String
     @Column(index: 2) var score: Int

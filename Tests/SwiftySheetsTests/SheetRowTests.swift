@@ -10,7 +10,7 @@ final class SheetRowTests: XCTestCase {
     // MARK: - Supported Types Tests
     
     @SheetRow
-    struct AllTypes: SheetRowCodable, Equatable {
+    struct AllTypes {
         @Column("A") var string: String
         @Column("B") var integer: Int
         @Column("C") var double: Double
@@ -47,12 +47,16 @@ final class SheetRowTests: XCTestCase {
         XCTAssertEqual(encoded[3], "FALSE") // or FALSE
         XCTAssertEqual(encoded[4], "")
         XCTAssertEqual(encoded[5], "99")
+        
+        // Verify Equatable
+        let obj3 = AllTypes(string: "S", integer: 1, double: 1.5, boolean: false, optionalString: nil, optionalInt: 99)
+        XCTAssertEqual(obj2, obj3)
     }
     
     // MARK: - Date Types Tests
     
     @SheetRow
-    struct DateRow: SheetRowCodable, Equatable {
+    struct DateRow {
         @Column("A") var isoDate: Date
         @Column("B", format: "yyyy-MM-dd") var customDate: Date
         @Column("C") var optionalDate: Date?
@@ -88,5 +92,9 @@ final class SheetRowTests: XCTestCase {
         let encoded = try obj.encodeRow()
         XCTAssertEqual(encoded[0], isoStr)
         XCTAssertEqual(encoded[1], customStr)
+        
+        // Verify Equatable
+        let obj2 = try DateRow(row: row)
+        XCTAssertEqual(obj, obj2)
     }
 }
