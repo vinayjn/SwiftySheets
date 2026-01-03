@@ -40,18 +40,28 @@ print("Title: \(spreadsheet.metadata.properties.title)")
 
 ### 3. Define Data Models (Macros)
 
-Use the `@SheetRow` macro to map Swift structs to spreadsheet rows.
-
-```swift
-@SheetRow
-struct User {
-    @Column("A") var name: String
-    @Column("B") var email: String
-    @Column(index: 2) var score: Int
-}
-```
-
-The `@SheetRow` macro automatically adds conformance to `SheetRowCodable`, `Equatable`, and `Hashable`.
+### 3. Define Data Models (Macros)
+ 
+ Use the `@SheetRow` macro to map Swift structs to spreadsheet rows. The macro handles all `Codable`, `Equatable`, and `Hashable` conformance automatically.
+ 
+ ```swift
+ @SheetRow
+ struct User {
+     @Column("A") var name: String
+     @Column("B") var email: String
+     @Column(index: 2) var score: Int
+     @Column("D") var isActive: Bool
+     @Column("E", format: "yyyy-MM-dd") var joinDate: Date
+     @Column("F") var nickname: String?
+ }
+ ```
+ 
+ **Supported Types:**
+ - `String`, `String?`
+ - `Int`, `Int?`
+ - `Double`, `Double?`
+ - `Bool`, `Bool?` (Maps to "TRUE"/"FALSE")
+ - `Date`, `Date?` (Default: ISO8601, or custom via `format:`)
 
 ### 4. Read Data
 
