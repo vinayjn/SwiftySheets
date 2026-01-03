@@ -4,6 +4,13 @@ import SwiftSyntaxBuilder
 import SwiftDiagnostics
 
 public struct SheetRowMacro: MemberMacro {
+    
+    struct PropInfo {
+        let name: String
+        let type: String
+        let columnIndex: Int
+    }
+    
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf declaration: some DeclGroupSyntax,
@@ -17,8 +24,7 @@ public struct SheetRowMacro: MemberMacro {
         let members = structDecl.memberBlock.members
         let storedProperties = members.compactMap { $0.decl.as(VariableDeclSyntax.self) }
         
-        // 1. Generate init(row: [String])
-        var initBody = ""
+        var props: [PropInfo] = []
         
         for property in storedProperties {
             guard let binding = property.bindings.first,
@@ -32,28 +38,67 @@ public struct SheetRowMacro: MemberMacro {
             if let attribute = property.attributes.first(where: {
                 $0.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == "Column"
             }), let args = attribute.as(AttributeSyntax.self)?.arguments?.as(LabeledExprListSyntax.self) {
-                // Handle @Column("A") or @Column(index: 0)
-                if let stringLiteral = args.first?.expression.as(StringLiteralExprSyntax.self)?.segments.first?.as(StringSegmentSyntax.self)?.content.text {
+                 if let stringLiteral = args.first?.expression.as(StringLiteralExprSyntax.self)?.segments.first?.as(StringSegmentSyntax.self)?.content.text {
                     columnIndex = columnLetterToIndex(stringLiteral)
                 } else if let intLiteral = args.first?.expression.as(IntegerLiteralExprSyntax.self)?.literal.text {
                     columnIndex = Int(intLiteral) ?? 0
                 } else {
-                    columnIndex = 0 // Default or Error
+                    columnIndex = 0
                 }
             } else {
-                // Default to 0 or error? Or skip?
-                // For now, let's skip non-annotated or implement auto-increment if we want
-                continue 
+                continue
+            }
+            props.append(PropInfo(name: name, type: type, columnIndex: columnIndex))
+        }
+        
+        // 1. Generate init(row: [String])
+        var initBody = ""
+        for p in props {
+            let col = p.columnIndex
+            let type = p.type.trimmingCharacters(in: .whitespaces)
+            let isOptional = type.hasSuffix("?")
+            let cleanType = isOptional ? String(type.dropLast()) : type
+            
+            let safeRead = "row.count > \(col) ? row[\(col)] : \"\""
+            
+            let rawVar = "raw_\(p.name)"
+            
+            // Conversion logic
+            var conversion = ""
+            if cleanType == "String" {
+                if isOptional {
+                    conversion = "let \(rawVar) = \(safeRead); self.\(p.name) = \(rawVar).isEmpty ? nil : \(rawVar)"
+                } else {
+                    conversion = "self.\(p.name) = \(safeRead)"
+                }
+            } else if cleanType == "Int" {
+                if isOptional {
+                    conversion = "let \(rawVar) = \(safeRead); self.\(p.name) = \(rawVar).isEmpty ? nil : Int(\(rawVar))"
+                } else {
+                    conversion = "self.\(p.name) = Int(\(safeRead)) ?? 0"
+                }
+            } else if cleanType == "Double" {
+                 if isOptional {
+                    conversion = "let \(rawVar) = \(safeRead); self.\(p.name) = \(rawVar).isEmpty ? nil : Double(\(rawVar))"
+                } else {
+                    conversion = "self.\(p.name) = Double(\(safeRead)) ?? 0.0"
+                }
+            } else if cleanType == "Bool" {
+                let boolParse = "((\(safeRead)).lowercased() == \"true\")"
+                if isOptional {
+                    conversion = "let \(rawVar) = \(safeRead); self.\(p.name) = \(rawVar).isEmpty ? nil : ((\(rawVar)).lowercased() == \"true\")"
+                } else {
+                    conversion = "self.\(p.name) = \(boolParse)"
+                }
+            } else {
+                 if isOptional {
+                    conversion = "self.\(p.name) = nil"
+                 } else {
+                    conversion = "// Unsupported type \(cleanType)"
+                 }
             }
             
-            // Generate decode logic
-            // This assumes properties are String or basic types.
-            // Ideally we check type but for MVP let's support String and Int
-            if type.contains("String") {
-                initBody += "self.\(name) = row.count > \(columnIndex) ? row[\(columnIndex)] : \"\"\n"
-            } else if type.contains("Int") {
-                initBody += "self.\(name) = (row.count > \(columnIndex) ? Int(row[\(columnIndex)]) : nil) ?? 0\n"
-            }
+            initBody += "\n    // \(p.name): \(type)\n    \(conversion)"
         }
         
         let initDecl = """
@@ -64,32 +109,40 @@ public struct SheetRowMacro: MemberMacro {
         
         // 2. Generate encodeRow() -> [String]
         var maxIndex = 0
-        var usageStmts = ""
+        for p in props { if p.columnIndex > maxIndex { maxIndex = p.columnIndex } }
         
-        for property in storedProperties {
-            // Re-parsing logic (should be factored out but duplicating for now for speed)
-             guard let binding = property.bindings.first,
-                  let name = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text else {
-                continue
-            }
+        var usageStmts = ""
+        for p in props {
+            let col = p.columnIndex
+            let type = p.type.trimmingCharacters(in: .whitespaces)
+            let isOptional = type.hasSuffix("?")
+            let cleanType = isOptional ? String(type.dropLast()) : type
             
-            let columnIndex: Int
-            if let attribute = property.attributes.first(where: {
-                $0.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == "Column"
-            }), let args = attribute.as(AttributeSyntax.self)?.arguments?.as(LabeledExprListSyntax.self) {
-                if let stringLiteral = args.first?.expression.as(StringLiteralExprSyntax.self)?.segments.first?.as(StringSegmentSyntax.self)?.content.text {
-                    columnIndex = columnLetterToIndex(stringLiteral)
-                } else if let intLiteral = args.first?.expression.as(IntegerLiteralExprSyntax.self)?.literal.text {
-                    columnIndex = Int(intLiteral) ?? 0
+            var encodeExpr = ""
+            
+            if cleanType == "String" {
+                if isOptional {
+                    encodeExpr = "self.\(p.name) ?? \"\""
                 } else {
-                    columnIndex = 0
+                    encodeExpr = "self.\(p.name)"
+                }
+            } else if cleanType == "Int" || cleanType == "Double" {
+                if isOptional {
+                    encodeExpr = "self.\(p.name).map(String.init) ?? \"\""
+                } else {
+                    encodeExpr = "String(self.\(p.name))"
+                }
+            } else if cleanType == "Bool" {
+                if isOptional {
+                    encodeExpr = "self.\(p.name).map { $0 ? \"TRUE\" : \"FALSE\" } ?? \"\""
+                } else {
+                    encodeExpr = "(self.\(p.name) ? \"TRUE\" : \"FALSE\")"
                 }
             } else {
-                continue 
+                encodeExpr = "\"\""
             }
             
-            if columnIndex > maxIndex { maxIndex = columnIndex }
-            usageStmts += "if values.count > \(columnIndex) { values[\(columnIndex)] = String(self.\(name)) }\n"
+            usageStmts += "if values.count > \(col) { values[\(col)] = \(encodeExpr) }\n"
         }
         
         let encodeDecl = """
@@ -99,20 +152,14 @@ public struct SheetRowMacro: MemberMacro {
             return values
         }
         """
-        
-        
+
         // 3. Generate memberwise init
         var memberwiseParams: [String] = []
         var memberwiseAssigns: [String] = []
         
-        for property in storedProperties {
-             guard let binding = property.bindings.first,
-                   let name = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text,
-                   let type = binding.typeAnnotation?.type.description else {
-                continue
-            }
-            memberwiseParams.append("\(name): \(type)")
-            memberwiseAssigns.append("self.\(name) = \(name)")
+        for p in props {
+            memberwiseParams.append("\(p.name): \(p.type)")
+            memberwiseAssigns.append("self.\(p.name) = \(p.name)")
         }
         
         let memberwiseInit = """
@@ -125,10 +172,11 @@ public struct SheetRowMacro: MemberMacro {
     }
     
     private static func columnLetterToIndex(_ letter: String) -> Int {
-        // Simple A -> 0 conversion
-        let uppercase = letter.uppercased()
-        guard let scalar = uppercase.unicodeScalars.first else { return 0 }
-        return Int(scalar.value) - 65
+        var column = 0
+        for char in letter.uppercased().unicodeScalars {
+            column = column * 26 + (Int(char.value) - 64)
+        }
+        return column - 1
     }
 }
 
