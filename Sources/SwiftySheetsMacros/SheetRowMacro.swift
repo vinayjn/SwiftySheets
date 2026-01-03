@@ -100,7 +100,28 @@ public struct SheetRowMacro: MemberMacro {
         }
         """
         
-        return [DeclSyntax(stringLiteral: initDecl), DeclSyntax(stringLiteral: encodeDecl)]
+        
+        // 3. Generate memberwise init
+        var memberwiseParams: [String] = []
+        var memberwiseAssigns: [String] = []
+        
+        for property in storedProperties {
+             guard let binding = property.bindings.first,
+                   let name = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text,
+                   let type = binding.typeAnnotation?.type.description else {
+                continue
+            }
+            memberwiseParams.append("\(name): \(type)")
+            memberwiseAssigns.append("self.\(name) = \(name)")
+        }
+        
+        let memberwiseInit = """
+        public init(\(memberwiseParams.joined(separator: ", "))) {
+            \(memberwiseAssigns.joined(separator: "\n    "))
+        }
+        """
+        
+        return [DeclSyntax(stringLiteral: initDecl), DeclSyntax(stringLiteral: encodeDecl), DeclSyntax(stringLiteral: memberwiseInit)]
     }
     
     private static func columnLetterToIndex(_ letter: String) -> Int {

@@ -400,6 +400,13 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         
         let encoded = try user.encodeRow()
         XCTAssertEqual(encoded, ["Alice", "alice@example.com", "100"])
+        XCTAssertEqual(encoded, ["Alice", "alice@example.com", "100"])
+    }
+    
+    func testMemberwiseInit() {
+        let user = TestUser(name: "Bob", email: "bob@example.com", points: 50)
+        XCTAssertEqual(user.name, "Bob")
+        XCTAssertEqual(user.points, 50)
     }
     
     func testTypeSafeUpdateValues() async throws {
