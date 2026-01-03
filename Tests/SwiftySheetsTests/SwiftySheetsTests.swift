@@ -400,13 +400,24 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         
         let encoded = try user.encodeRow()
         XCTAssertEqual(encoded, ["Alice", "alice@example.com", "100"])
-        XCTAssertEqual(encoded, ["Alice", "alice@example.com", "100"])
     }
     
-    func testMemberwiseInit() {
-        let user = TestUser(name: "Bob", email: "bob@example.com", points: 50)
-        XCTAssertEqual(user.name, "Bob")
-        XCTAssertEqual(user.points, 50)
+    func testInitEquality() throws {
+        // Init via Row Array
+        let row = ["Alice", "alice@example.com", "100"]
+        let userFromRow = try TestUser(row: row)
+        
+        // Init via Memberwise
+        let userFromProps = TestUser(name: "Alice", email: "alice@example.com", points: 100)
+        
+        // Verify properties match
+        XCTAssertEqual(userFromRow.name, userFromProps.name)
+        XCTAssertEqual(userFromRow.email, userFromProps.email)
+        XCTAssertEqual(userFromRow.points, userFromProps.points)
+        
+        // Verify Equatable conformance (Synthesized)
+        // Note: XCTAssertEqual requires Equatable.
+        XCTAssertEqual(userFromRow, userFromProps)
     }
     
     func testTypeSafeUpdateValues() async throws {
@@ -614,7 +625,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
 }
 
 @SheetRow
-struct TestUser: SheetRowCodable {
+struct TestUser: SheetRowCodable, Equatable {
     @Column("A") var name: String
     @Column("B") var email: String
     @Column(index: 2) var points: Int
