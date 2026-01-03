@@ -6,6 +6,9 @@ struct DemoUser {
     @Column("A") var name: String
     @Column("B") var email: String
     @Column(index: 2) var score: Int
+    @Column("D") var isActive: Bool
+    @Column("E", format: "yyyy-MM-dd") var joinDate: Date
+    @Column("F") var nickname: String?
 }
 
 @main
@@ -67,101 +70,85 @@ struct SwiftySheetsDemo {
                 exit(1)
             }
             print("✅ Sheet added with ID: \(sheetId)")
-            
-            // Refresh metadata to ensure the new sheet is known for subsequent lookups (like format)
             try await spreadsheet.refreshMetadata()
             
-            // 4. Raw Data Operations (Non-Type Safe)
+            // 4. Raw Data Operations (Headers)
             print("📝 [Raw] Writing header row...")
             _ = try await spreadsheet.updateValues(
-                range: "DemoSheet!A1:C1",
-                values: [["Name", "Email", "Score"]]
+                range: "DemoSheet!A1:F1",
+                values: [["Name", "Email", "Score", "Active", "Joined", "Nickname"]]
             )
             
-             print("📖 [Raw] Reading headers back...")
-             let headers = try await spreadsheet.values(range: "DemoSheet!A1:C1")
-             print("   Headers: \(headers.first ?? [])")
-             
              // 4b. Format Header
              print("🎨 Formatting header...")
              let headerFormat = CellFormat(
                  backgroundColor: .blue,
                  textFormat: TextFormat(foregroundColor: .white, bold: true)
              )
-             try await spreadsheet.format(range: "DemoSheet!A1:C1", format: headerFormat)
+             try await spreadsheet.format(range: "DemoSheet!A1:F1", format: headerFormat)
              print("✅ Header formatted.")
              
              // 5. Type-Safe Write using Macros
             print("✍️ [Type-Safe] Writing user data...")
+            
+            // Helper to create dates
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let date1 = formatter.date(from: "2023-01-01")!
+            let date2 = formatter.date(from: "2023-05-15")!
+            
+            // Note: init(name:email:...) memberwise initializer is auto-generated
             let users = [
-                try DemoUser(row: ["Alice", "alice@test.com", "100"]),
-                try DemoUser(row: ["Bob", "bob@test.com", "250"])
+                DemoUser(name: "Alice", email: "alice@test.com", score: 100, isActive: true, joinDate: date1, nickname: "Ally"),
+                DemoUser(name: "Bob", email: "bob@test.com", score: 250, isActive: false, joinDate: date2, nickname: nil)
             ]
             
-            // New Generic API
+            // Encode rows (SheetRowEncodable is auto-conformed)
+            let values = try users.map { try $0.encodeRow() }
+            
             try await spreadsheet.updateValues(
                 range: "DemoSheet!A2",
-                values: users
+                values: values
             )
             print("✅ Users written.")
             
             // 6. Type-Safe Append
             print("➕ [Append] Appending a new user...")
-            let newUser = try DemoUser(row: ["Charlie", "charlie@test.com", "50"])
+            let date3 = formatter.date(from: "2023-12-01")!
+            let newUser = DemoUser(name: "Charlie", email: "charlie@test.com", score: 50, isActive: true, joinDate: date3, nickname: "Chuck")
+            
             try await spreadsheet.appendValues(
-                range: "DemoSheet!A1", // A1 is enough, Google finds the next empty row
-                values: [newUser]
+                range: "DemoSheet!A1",
+                values: [try newUser.encodeRow()]
             )
             print("✅ User appended.")
             
             // 7. Type-Safe Read
             print("📖 [Type-Safe] Reading all users...")
             var readUsers = try await spreadsheet.values(
-                range: "DemoSheet!A2:C", // Skip header
+                range: "DemoSheet!A2:F", // Read columns A to F
                 type: DemoUser.self
             )
             
             for user in readUsers {
-                print("   - \(user.name) (\(user.email)): \(user.score) points")
+                let nick = user.nickname ?? "-"
+                let dateStr = formatter.string(from: user.joinDate)
+                print("   - \(user.name): Score=\(user.score), Active=\(user.isActive), Joined=\(dateStr), Nick=\(nick)")
             }
             
             // 8. Sorting
             print("🔃 Sorting by Score (Column C, Index 2)...")
-            // A2:C covers 3 columns. Column C is index 2 relative to A? 
-            // API SortSpec dimensionIndex is absolute index in the grid.
-            // Since A is 0, C is 2.
-            try await spreadsheet.sort(range: "DemoSheet!A2:C", column: 2, ascending: false) // Descending score
+            try await spreadsheet.sort(range: "DemoSheet!A2:F", column: 2, ascending: false)
             print("✅ Sorted.")
             
-            readUsers = try await spreadsheet.values(range: "DemoSheet!A2:C", type: DemoUser.self)
+            readUsers = try await spreadsheet.values(range: "DemoSheet!A2:F", type: DemoUser.self)
             print("   Top Scorer: \(readUsers.first?.name ?? "None")")
 
             // 9. Clear Values
             print("🧹 Clearing data...")
-            try await spreadsheet.clearValues(range: "DemoSheet!A2:C") // Keep headers
+            try await spreadsheet.clearValues(range: "DemoSheet!A2:F")
             print("✅ Data cleared.")
             
-            
-            // 10. DX: Resize Sheet (using DSL)
-            print("📏 Resizing 'DemoSheet' to 50 rows x 5 columns (DSL)...")
-            // Fetch sheet object for DSL
-            let sheetObj = try spreadsheet.sheet(named: "DemoSheet")
-            
-            try await spreadsheet.batchUpdate {
-                ResizeSheet(sheet: sheetObj, rows: 50, columns: 5)
-            }
-            
-            // Verify?
-            try await spreadsheet.refreshMetadata()
-            let resizedSheet = try spreadsheet.sheet(named: "DemoSheet")
-            print("   New size: \(resizedSheet.rowCount) x \(resizedSheet.columnCount)")
-            
-            // 11. DX: Easy Cell Access
-            print("🔍 Reading cell A1...")
-            if let val = try await spreadsheet.cell(sheet: "DemoSheet", row: 1, column: 1) {
-                print("   A1: \(val)")
-            }
-
             // 12. Clean up
             print("🧹 Cleaning up (Deleting Sheet ID: \(sheetId))...")
             try await spreadsheet.batchUpdate {
