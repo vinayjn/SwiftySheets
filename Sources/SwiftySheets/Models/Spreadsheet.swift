@@ -271,7 +271,8 @@ public extension Spreadsheet {
         values: [T],
         valueInputOption: ValueInputOption = .userEntered
     ) async throws -> UpdateValuesResponse {
-        try await updateValues(range: range, values: values, valueInputOption: valueInputOption)
+        let encodedValues = try values.map { try $0.encodeRow() }
+        return try await updateValues(range: range.description, values: encodedValues, valueInputOption: valueInputOption)
     }
 
     func appendValues(
@@ -288,7 +289,8 @@ public extension Spreadsheet {
         values: [T],
         valueInputOption: ValueInputOption = .userEntered
     ) async throws -> UpdateValuesResponse {
-        try await appendValues(range: range.description, values: values, valueInputOption: valueInputOption)
+        let encodedValues = try values.map { try $0.encodeRow() }
+        return try await appendValues(range: range.description, values: encodedValues, valueInputOption: valueInputOption)
     }
     
     @discardableResult

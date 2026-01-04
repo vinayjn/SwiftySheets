@@ -328,9 +328,9 @@ public struct GridRange: Codable {
     public init(range: String, sheetId: Int) {
         let sheetRange = SheetRange(stringLiteral: range)
         
-        let startRowIndex = sheetRange.startRow.map { $0 - 1 }
+        let startRowIndex = sheetRange.startRow.map { $0.value - 1 }
         
-        var endRowIndex: Int? = sheetRange.endRow
+        var endRowIndex: Int? = sheetRange.endRow?.value
         if endRowIndex == nil, let start = startRowIndex {
             // If start is defined but end is not (e.g. "A1"), it implies a single cell/row, so end = start + 1
             // Unless it's an open range like "A1:". But my parser doesn't support "A1:" explicitly as distinct from A1 usually.
@@ -342,11 +342,11 @@ public struct GridRange: Codable {
             }
         }
         
-        let startColumnIndex = sheetRange.startColumn.map { SheetRange.columnToIndex($0) }
+        let startColumnIndex = sheetRange.startColumn.map { SheetRange.columnToIndex($0.value) }
         
         var endColumnIndex: Int?
         if let endColStr = sheetRange.endColumn {
-            endColumnIndex = SheetRange.columnToIndex(endColStr) + 1
+            endColumnIndex = SheetRange.columnToIndex(endColStr.value) + 1
         } else if let start = startColumnIndex {
              // If start col defined ("A1") but end is nil, imply single column.
              endColumnIndex = start + 1

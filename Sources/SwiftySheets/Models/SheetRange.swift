@@ -2,17 +2,17 @@ import Foundation
 
 public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByStringLiteral {
     public let sheetName: String?
-    public let startColumn: String?
-    public let startRow: Int?
-    public let endColumn: String?
-    public let endRow: Int?
+    public let startColumn: SheetColumn?
+    public let startRow: SheetRowIndex?
+    public let endColumn: SheetColumn?
+    public let endRow: SheetRowIndex?
     
     public init(
         sheetName: String? = nil,
-        startColumn: String? = nil,
-        startRow: Int? = nil,
-        endColumn: String? = nil,
-        endRow: Int? = nil
+        startColumn: SheetColumn? = nil,
+        startRow: SheetRowIndex? = nil,
+        endColumn: SheetColumn? = nil,
+        endRow: SheetRowIndex? = nil
     ) {
         self.sheetName = sheetName
         self.startColumn = startColumn
@@ -20,6 +20,8 @@ public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByString
         self.endColumn = endColumn
         self.endRow = endRow
     }
+    
+
     
     public init(stringLiteral value: String) {
         // Format: Sheet1!A1:B2 or A1:B2 or Sheet1!A1
@@ -59,13 +61,13 @@ public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByString
     
     // Helper to convert "A" -> 0, "B" -> 1
     public static func columnToIndex(_ column: String) -> Int {
+        // Use SheetColumn validation logic if needed
         var result = 0
         for char in column.unicodeScalars {
             result = result * 26 + Int(char.value) - Int(UnicodeScalar("A").value) + 1
         }
         return result - 1
     }
-
     
     public static func indexToColumn(_ index: Int) -> String {
         var i = index + 1
@@ -78,13 +80,19 @@ public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByString
         return col
     }
     
-    private static func parseCell(_ cell: String) -> (col: String?, row: Int?) {
+    private static func parseCell(_ cell: String) -> (col: SheetColumn?, row: SheetRowIndex?) {
         // Separate letters and numbers
         let letters = cell.filter { $0.isLetter }
         let numbers = cell.filter { $0.isNumber }
         
-        let col = letters.isEmpty ? nil : String(letters)
-        let row = Int(numbers)
+        // Use initializers which validate.
+        let col = letters.isEmpty ? nil : SheetColumn(String(letters))
+        let row: SheetRowIndex?
+        if let n = Int(numbers) {
+            row = SheetRowIndex(n)
+        } else {
+            row = nil
+        }
         
         return (col, row)
     }
@@ -95,19 +103,19 @@ public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByString
             str += "\(sheetName)!"
         }
         if let startColumn = startColumn {
-            str += startColumn
+            str += startColumn.description
         }
         if let startRow = startRow {
-            str += "\(startRow)"
+            str += startRow.description
         }
         if endColumn != nil || endRow != nil {
             str += ":"
         }
         if let endColumn = endColumn {
-            str += endColumn
+            str += endColumn.description
         }
         if let endRow = endRow {
-            str += "\(endRow)"
+            str += endRow.description
         }
         return str
     }
@@ -120,24 +128,42 @@ public extension SheetRange {
         SheetRange(sheetName: sheet)
     }
     
-    func from(col: String? = nil, row: Int? = nil) -> SheetRange {
+    func from(col: SheetColumn? = nil, row: SheetRowIndex? = nil) -> SheetRange {
         var range = self
-        if let c = col { range = SheetRange(sheetName: sheetName, startColumn: c, startRow: range.startRow, endColumn: range.endColumn, endRow: range.endRow) }
-        if let r = row { range = SheetRange(sheetName: sheetName, startColumn: range.startColumn, startRow: r, endColumn: range.endColumn, endRow: range.endRow) }
+        // Note: Using primitive types directly!
+        if let c = col { 
+            // Reconstruct with safe update
+             // We can use the init with typed args
+             range = range.with(startColumn: c)
+        }
+        if let r = row { 
+             range = range.with(startRow: r)
+        }
         return range
     }
     
-    func to(col: String? = nil, row: Int? = nil) -> SheetRange {
-        var range = self
-        // If start is missing, this acts as end?
-        // Usually .from().to() implies start -> end.
+    func to(col: SheetColumn? = nil, row: SheetRowIndex? = nil) -> SheetRange {
         // We set end properties.
-        return SheetRange(
-            sheetName: sheetName,
-            startColumn: startColumn,
-            startRow: startRow,
-            endColumn: col ?? endColumn,
-            endRow: row ?? endRow
+        var r = self
+        if let c = col { r = r.with(endColumn: c) }
+        if let rw = row { r = r.with(endRow: rw) }
+        return r
+    }
+    
+    // Compatibility Overloads for raw values (optional, but requested behavior is strict?)
+    // User requested: "col item should ONLY expect a Column"
+    // So removing String overloads forces usage of SheetColumn("A") or literal "A".
+}
+
+// Internal immutable setters
+internal extension SheetRange {
+    func with(startColumn: SheetColumn? = nil, startRow: SheetRowIndex? = nil, endColumn: SheetColumn? = nil, endRow: SheetRowIndex? = nil) -> SheetRange {
+        SheetRange(
+            sheetName: self.sheetName,
+            startColumn: startColumn ?? self.startColumn,
+            startRow: startRow ?? self.startRow,
+            endColumn: endColumn ?? self.endColumn,
+            endRow: endRow ?? self.endRow
         )
     }
 }
