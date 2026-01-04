@@ -90,6 +90,22 @@ try await spreadsheet.sort(range: "Sheet1!A2:C", column: 0, ascending: true)
 try await spreadsheet.clearValues(range: "Sheet1!D1:D100")
 ```
 
+### 🚕 Drive Integration
+
+SwiftySheets now includes a `DriveClient` to manage your files directly.
+
+```swift
+// List Spreadsheets
+let files = try await client.drive.list(query: DriveQuery.spreadsheets.and(.notTrashed))
+for file in files {
+    print("\(file.name) (\(file.id))")
+}
+
+// Create & Delete
+let newFile = try await client.drive.create(name: "Backup", mimeType: "application/json")
+try await client.drive.delete(id: newFile.id)
+```
+
 ### Raw Access
 If you don't need models, you can always fall back to raw strings:
 ```swift

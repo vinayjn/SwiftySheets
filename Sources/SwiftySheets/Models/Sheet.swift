@@ -127,15 +127,7 @@ public extension Sheet {
     var columnCount: Int { properties.gridProperties.columnCount }
 }
 
-// For Drive API responses
-public struct DriveSearchResponse: Decodable {
-    public let files: [DriveFile]
 
-    public struct DriveFile: Decodable {
-        public let id: String
-        public let name: String
-    }
-}
 
 // Write operation models
 public struct UpdateValuesRequest: Codable {

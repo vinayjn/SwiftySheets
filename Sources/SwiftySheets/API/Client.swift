@@ -19,6 +19,8 @@ public final class Client {
         self.transport = transport
     }
     
+    public lazy var drive: DriveClient = DriveClient(transport: transport as! SheetsTransport)
+    
     public convenience init(
         credentials: GoogleCredentials,
         session: URLSessionProtocol = URLSession.shared
@@ -108,15 +110,11 @@ public extension Client {
     }
     
     func deleteSpreadsheet(id: String) async throws {
-        let request = try DriveEndpoint.delete(fileId: id).request()
-        try await makeRequest(request)
+        try await drive.delete(id: id)
     }
     
     func listSpreadsheets() async throws -> [DriveFile] {
-        let query = "mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false"
-        let request = try DriveEndpoint.list(query: query).request()
-        let response: DriveFileList = try await makeRequest(request)
-        return response.files
+        return try await drive.list(query: DriveQuery.spreadsheets.and(.notTrashed).query)
     }
     
     func updateValues(
