@@ -14,173 +14,360 @@ struct DemoUser {
 @main
 struct SwiftySheetsDemo {
     static func main() async {
-        print("🚀 Starting SwiftySheets Demo...")
-        
+        var app = DemoApp()
+        await app.run()
+    }
+}
+
+struct DemoApp {
+    var client: Client?
+    var spreadsheet: Spreadsheet?
+    
+    // Constant string
+    let demoSheetName = "DemoSheet"
+    
+    mutating func run() async {
+        print("🚀 Starting SwiftySheets Interactive Demo...")
+        do {
+            try await setup()
+            await runMainLoop()
+        } catch {
+            print("❌ Fatal Error: \(error)")
+            exit(1)
+        }
+    }
+    
+    mutating func setup() async throws {
         // 1. Setup Credentials
-        // Read configuration from environment variables
         guard let jsonPath = ProcessInfo.processInfo.environment["SWIFTYSHEETS_SERVICE_ACCOUNT_PATH"] else {
             print("❌ Missing environment variable: SWIFTYSHEETS_SERVICE_ACCOUNT_PATH")
             exit(1)
         }
+        
+        let credentials = try ServiceAccountCredentials(jsonPath: jsonPath)
+        client = Client(credentials: credentials)
+        
+        // 2. Check for optional ENV ID to auto-open
+        if let envId = ProcessInfo.processInfo.environment["SWIFTYSHEETS_SPREADSHEET_ID"], let client = client {
+            print("ℹ️ Auto-opening ID from ENV: \(envId)")
+            do {
+                spreadsheet = try await client.spreadsheet(id: envId)
+                print("✅ Opened: \(spreadsheet?.metadata.properties.title ?? "Unknown")")
+            } catch {
+                 print("⚠️ Failed to open ENV ID: \(error)")
+            }
+        }
+    }
+    
+    mutating func runMainLoop() async {
+        var shouldExit = false
+        while !shouldExit {
+            print("\n-------------------------------------------")
+            if let s = spreadsheet {
+                print("📍 SPREADSHEET MODE: \(s.metadata.properties.title)")
+                shouldExit = await runSpreadsheetMenu()
+            } else {
+                print("📍 MANAGER MODE: (No Spreadsheet Open)")
+                // Pass client safely
+                guard client != nil else {
+                     print("❌ Client not initialized")
+                     return
+                }
+                shouldExit = await runManagerMenu()
+            }
+            print("-------------------------------------------")
+        }
+        print("👋 Exiting Demo.")
+    }
 
-        // 2. Determine Spreadsheet ID
-        let envSpreadsheetId = ProcessInfo.processInfo.environment["SWIFTYSHEETS_SPREADSHEET_ID"]
-        var createdSpreadsheetId: String? = nil
-        var spreadsheet: Spreadsheet
+    // MARK: - Manager Mode (Drive API)
+    
+    mutating func runManagerMenu() async -> Bool {
+        print("1. 📂 List Spreadsheets")
+        print("2. 🆕 Create New Spreadsheet")
+        print("3. 🆔 Open by ID")
+        print("0. 🚪 Exit")
+        print("Enter choice: ", terminator: "")
+        
+        guard let choice = readLine() else { return true }
+        print("")
         
         do {
-            let credentials = try ServiceAccountCredentials(jsonPath: jsonPath)
-            let client = Client(credentials: credentials)
-            
-            if let id = envSpreadsheetId {
-                print("ℹ️ Using ID from ENV: \(id)")
-                spreadsheet = try await client.spreadsheet(id: id)
-            } else {
-                print("📝 No ID provided. Creating a temporary spreadsheet...")
-                let title = "SwiftySheets Demo \(Int(Date().timeIntervalSince1970))"
-                spreadsheet = try await client.createSpreadsheet(title: title)
-                createdSpreadsheetId = spreadsheet.metadata.spreadsheetId
-                print("✅ Created Spreadsheet: \(title) (ID: \(spreadsheet.metadata.spreadsheetId))")
+            switch choice {
+            case "1": try await listSpreadsheets()
+            case "2": try await createNewSpreadsheet()
+            case "3": try await openById()
+            case "0": return true
+            default: print("❌ Invalid choice")
             }
-            
-            print("✅ Ready to work on: \(spreadsheet.metadata.properties.title)")
-            
-            // 3. Add a Sheet using DSL
-            print("PAGE: Adding a new sheet 'DemoSheet'...")
-            
-            // Check if it exists first and delete (Clean Slate)
+        } catch {
+            print("⚠️ Action Failed: \(error)")
+        }
+        return false
+    }
+    
+    mutating func listSpreadsheets() async throws {
+        guard let client = client else { return }
+        print("🔍 Fetching spreadsheets...")
+        let files = try await client.listSpreadsheets()
+        
+        if files.isEmpty {
+            print("   (No spreadsheets found)")
+            return
+        }
+        
+        print("\n📄 Found \(files.count) spreadsheets:")
+        for (index, file) in files.enumerated() {
+            print("   [\(index + 1)] \(file.name) (ID: \(file.id))")
+        }
+        
+        print("\nOp: Enter number to open, 'd' + number to delete (e.g. d1), or Enter to cancel: ", terminator: "")
+        guard let input = readLine(), !input.isEmpty else { return }
+        
+        if input.starts(with: "d") {
+            // Delete flow
+            let indexStr = input.dropFirst()
+            if let index = Int(indexStr), index > 0, index <= files.count {
+                let file = files[index - 1]
+                print("🗑️ Deleting '\(file.name)'...")
+                try await client.deleteSpreadsheet(id: file.id)
+                print("✅ Deleted.")
+            }
+        } else {
+            // Open flow
+            if let index = Int(input), index > 0, index <= files.count {
+                let file = files[index - 1]
+                print("Opening '\(file.name)'...")
+                spreadsheet = try await client.spreadsheet(id: file.id)
+            }
+        }
+    }
+    
+    mutating func createNewSpreadsheet() async throws {
+        guard let client = client else { return }
+        print("Enter title for new spreadsheet: ", terminator: "")
+        let title = readLine() ?? "Untitled"
+        
+        print("Creating '\(title)'...")
+        spreadsheet = try await client.createSpreadsheet(title: title)
+        print("✅ Created and Opened (ID: \(spreadsheet?.metadata.spreadsheetId ?? "?"))")
+    }
+    
+    mutating func openById() async throws {
+        guard let client = client else { return }
+        print("Enter Spreadsheet ID: ", terminator: "")
+        guard let id = readLine(), !id.isEmpty else { return }
+        
+        print("Opening ID: \(id)...")
+        spreadsheet = try await client.spreadsheet(id: id)
+        print("✅ Opened.")
+    }
 
-            if let existingSheet = try? spreadsheet.sheet(named: "DemoSheet") {
-                let idToDelete = existingSheet.properties.sheetId
-                print("⚠️ 'DemoSheet' already exists. Deleting it first...")
-                try await spreadsheet.batchUpdate {
-                    DeleteSheet(id: idToDelete)
-                }
-                // Refresh metadata after deletion to ensure local state is synced
-                try await spreadsheet.refreshMetadata()
+    // MARK: - Spreadsheet Mode
+    
+    mutating func runSpreadsheetMenu() async -> Bool {
+        guard spreadsheet != nil else { return false }
+        
+        print("1. 📄 Show Info")
+        print("2. ➕ Add/Reset Demo Sheet")
+        print("3. 📝 Write Dummy Data")
+        print("4. 📖 Read Data")
+        print("5. ⬇️ Append User")
+        print("6. 🔃 Sort Data")
+        print("7. 🧹 Clear Data")
+        print("8. 📏 Resize Sheet (DSL)")
+        print("9. 🔙 Close Spreadsheet (Back to Menu)")
+        print("0. 🗑️ Delete This Spreadsheet")
+        print("Enter choice: ", terminator: "")
+        
+        guard let choice = readLine() else { return true }
+        print("")
+
+        do {
+            switch choice {
+            case "1": try await showInfo()
+            case "2": try await setupDemoSheet()
+            case "3": try await writeDummyData()
+            case "4": try await readData()
+            case "5": try await appendUser()
+            case "6": try await sortData()
+            case "7": try await clearData()
+            case "8": try await resizeSheet()
+            case "9": 
+                spreadsheet = nil
+                print("🔙 Closed.")
+            case "0":
+                try await deleteCurrentSpreadsheet()
+            default: print("❌ Invalid choice")
             }
-            
-            let response = try await spreadsheet.batchUpdate {
-                AddSheet("DemoSheet")
-            }
-            
-            // Extract the new sheet ID from response
-            let newSheetId = response.replies?.first?.addSheet?.properties.sheetId
-            guard let sheetId = newSheetId else {
-                print("❌ Failed to get new sheet ID")
-                exit(1)
-            }
-            print("✅ Sheet added with ID: \(sheetId)")
-            try await spreadsheet.refreshMetadata()
-            
-            // 4. Raw Data Operations (Headers)
-            print("📝 [Raw] Writing header row...")
-            _ = try await spreadsheet.updateValues(
-                range: #Range("DemoSheet!A1:F1"),
-                values: [["Name", "Email", "Score", "Active", "Joined", "Nickname"]]
-            )
-            
-             // 4b. Format Header
-             print("🎨 Formatting header...")
-             let headerFormat = CellFormat(
-                 backgroundColor: .blue,
-                 textFormat: TextFormat(foregroundColor: .white, bold: true)
-             )
-             try await spreadsheet.format(range: #Range("DemoSheet!A1:F1"), format: headerFormat)
-             print("✅ Header formatted.")
-             
-             // 5. Type-Safe Write using Macros
-            print("✍️ [Type-Safe] Writing user data...")
-            
-            // Helper to create dates
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            let date1 = formatter.date(from: "2023-01-01")!
-            let date2 = formatter.date(from: "2023-05-15")!
-            
-            // Note: init(name:email:...) memberwise initializer is auto-generated
-            let users = [
-                DemoUser(name: "Alice", email: "alice@test.com", score: 100, isActive: true, joinDate: date1, nickname: "Ally"),
-                DemoUser(name: "Bob", email: "bob@test.com", score: 250, isActive: false, joinDate: date2, nickname: nil)
-            ]
-            
-            // Encode rows (SheetRowEncodable is auto-conformed)
-            let values = try users.map { try $0.encodeRow() }
-            
-            try await spreadsheet.updateValues(
-                range: #Range("DemoSheet!A2"),
-                values: values
-            )
-            print("✅ Users written.")
-            
-            // 6. Type-Safe Append
-            print("➕ [Append] Appending a new user...")
-            let date3 = formatter.date(from: "2023-12-01")!
-            let newUser = DemoUser(name: "Charlie", email: "charlie@test.com", score: 50, isActive: true, joinDate: date3, nickname: "Chuck")
-            
-            try await spreadsheet.appendValues(
-                range: #Range("DemoSheet!A1"),
-                values: [try newUser.encodeRow()]
-            )
-            print("✅ User appended.")
-            
-            // 9. DX: Sheet Properties & Fluent Range
-            let props = try spreadsheet.sheet(named: "DemoSheet").properties
-            print("📊 Sheet ID: \(props.sheetId), Index: \(props.index), Rows: \(props.gridProperties.rowCount)")
-            
-            // Fluent Range Builder Example
-            let fluentRange = SheetRange.root("DemoSheet")
-                .from(col: "A", row: 2)
-                .to(col: "Z")
-            print("🏗️ Fluent Range: \(fluentRange)") // Output: DemoSheet!A2:Z
-            
-            // 10. DX: Resize Sheet
-            print("📏 Resizing 'DemoSheet' to 50 rows x 5 columns...")
-            // 7. Type-Safe Read
-            print("📖 [Type-Safe] Reading all users...")
-            var readUsers = try await spreadsheet.values(
-                range: #Range("DemoSheet!A2:F"), // Read columns A to F
+        } catch {
+            print("⚠️ Action Failed: \(error)")
+        }
+        
+        return false // Don't exit app, just loop
+    }
+    
+    mutating func deleteCurrentSpreadsheet() async throws {
+        guard let client = client, let s = spreadsheet else { return }
+        print("💥 Are you sure you want to DELETE '\(s.metadata.properties.title)'? (y/n): ", terminator: "")
+        if readLine() == "y" {
+            try await client.deleteSpreadsheet(id: s.metadata.spreadsheetId)
+            print("✅ Deleted.")
+            spreadsheet = nil
+        }
+    }
+    
+    // Existing Actions Refactored
+    
+    mutating func showInfo() async throws {
+        guard spreadsheet != nil else { return }
+        try await spreadsheet!.refreshMetadata()
+        let props = spreadsheet!.metadata.properties
+        print("📊 Spreadsheet Info:")
+        print("   Title: \(props.title)")
+        print("   ID: \(spreadsheet!.metadata.spreadsheetId)")
+        print("   Sheets: \(spreadsheet!.metadata.sheets.count)")
+        for sheet in spreadsheet!.metadata.sheets {
+            let grid = sheet.properties.gridProperties
+            print("    - \(sheet.properties.title) (ID: \(sheet.properties.sheetId)) [\(grid.rowCount)x\(grid.columnCount)]")
+        }
+    }
+    
+    mutating func setupDemoSheet() async throws {
+        guard spreadsheet != nil else { return }
+        let name = demoSheetName
+        print("Adding/Resetting '\(name)'...")
+        
+        if let existingSheet = try? spreadsheet!.sheet(named: name) {
+            let id = existingSheet.properties.sheetId
+            print("   Deleting existing...")
+            try await spreadsheet!.batchUpdate { DeleteSheet(id: id) }
+            try await spreadsheet!.refreshMetadata()
+        }
+        
+        let response = try await spreadsheet!.batchUpdate { AddSheet(name) }
+        if let newId = response.replies?.first?.addSheet?.properties.sheetId {
+            print("✅ Sheet '\(name)' added with ID: \(newId)")
+        }
+        try await spreadsheet!.refreshMetadata()
+    }
+    
+    mutating func writeDummyData() async throws {
+        guard spreadsheet != nil else { return }
+        let name = demoSheetName
+        print("📝 Writing Headers & Dummy Data...")
+        
+        // Headers
+        _ = try await spreadsheet!.updateValues(
+            range: SheetRange(parsing: "\(name)!A1:F1"),
+            values: [["Name", "Email", "Score", "Active", "Joined", "Nickname"]]
+        )
+        
+        let headerFormat = CellFormat(
+            backgroundColor: .blue,
+            textFormat: TextFormat(foregroundColor: .white, bold: true)
+        )
+        try await spreadsheet!.format(range: SheetRange(parsing: "\(name)!A1:F1"), format: headerFormat)
+        
+        // Data
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let users = [
+            DemoUser(name: "Alice", email: "alice@test.com", score: 100, isActive: true, joinDate: formatter.date(from: "2023-01-01")!, nickname: "Ally"),
+            DemoUser(name: "Bob", email: "bob@test.com", score: 250, isActive: false, joinDate: formatter.date(from: "2023-05-15")!, nickname: nil)
+        ]
+        
+        let values = try users.map { try $0.encodeRow() }
+        try await spreadsheet!.updateValues(range: SheetRange(parsing: "\(name)!A2"), values: values)
+        print("✅ Written \(users.count) users + headers.")
+    }
+    
+    func readData() async throws {
+        guard let s = spreadsheet else { return }
+        let name = demoSheetName
+        print("📖 Reading Data from '\(name)'...")
+        
+        // We use 'try?' here in case sheet doesn't exist to avoid crashing the demo flow
+        do {
+            let users = try await s.values(
+                range: SheetRange(parsing: "\(name)!A2:F"),
                 type: DemoUser.self
             )
             
-            for user in readUsers {
+            if users.isEmpty {
+                print("   (No data found)")
+                return
+            }
+            
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            print("   --- Data Start ---")
+            for user in users {
                 let nick = user.nickname ?? "-"
                 let dateStr = formatter.string(from: user.joinDate)
-                print("   - \(user.name): Score=\(user.score), Active=\(user.isActive), Joined=\(dateStr), Nick=\(nick)")
+                print("   👤 \(user.name): Score=\(user.score), Active=\(user.isActive), Joined=\(dateStr), Nick=\(nick)")
             }
-            
-            // 8. Sorting
-            print("🔃 Sorting by Score (Column C, Index 2)...")
-            try await spreadsheet.sort(range: #Range("DemoSheet!A2:F"), column: 2, ascending: false)
-            print("✅ Sorted.")
-            
-            readUsers = try await spreadsheet.values(range: #Range("DemoSheet!A2:F"), type: DemoUser.self)
-            print("   Top Scorer: \(readUsers.first?.name ?? "None")")
-
-            // 9. Clear Values
-            print("🧹 Clearing data...")
-            try await spreadsheet.clearValues(range: #Range("DemoSheet!A2:F"))
-            print("✅ Data cleared.")
-            
-            // 12. Clean up
-            print("🧹 Cleaning up (Deleting Sheet ID: \(sheetId))...")
-            try await spreadsheet.batchUpdate {
-                DeleteSheet(id: sheetId)
-            }
-            print("✅ Sheet deleted.")
-            
-            print("🎉 Demo completed successfully!")
-            
-            // 9. Cleanup Created Spreadsheet
-            if let createdId = createdSpreadsheetId {
-                print("🗑️ Deleting temporary spreadsheet: \(createdId)...")
-                try await client.deleteSpreadsheet(id: createdId)
-                print("✅ Spreadsheet deleted.")
-            }
-            
+            print("   --- Data End ---")
         } catch {
-            print("❌ Error: \(error)")
-            exit(1)
+            print("❌ Read failed (Does sheet exist?): \(error)")
         }
+    }
+    
+    mutating func appendUser() async throws {
+        guard let s = spreadsheet else { return }
+        let name = demoSheetName
+        print("⬇️ Enter details:")
+        print("   Name: ", terminator: "")
+        let inputName = readLine() ?? "Unknown"
+        print("   Score: ", terminator: "")
+        let inputScore = Int(readLine() ?? "0") ?? 0
+        
+        let newUser = DemoUser(name: inputName, email: "\(inputName.lowercased())@example.com", score: inputScore, isActive: true, joinDate: Date(), nickname: nil)
+        
+        do {
+            try await s.appendValues(
+                range: SheetRange(parsing: "\(name)!A1"),
+                values: [try newUser.encodeRow()]
+            )
+            print("✅ Appended.")
+        } catch {
+             print("❌ Append failed: \(error)")
+        }
+    }
+    
+    mutating func sortData() async throws {
+        guard spreadsheet != nil else { return }
+        print("🔃 Sorting by Score...")
+        try await spreadsheet!.sort(range: SheetRange(parsing: "\(demoSheetName)!A2:F"), column: 2, ascending: false)
+        print("✅ Sorted.")
+    }
+    
+    mutating func clearData() async throws {
+        guard spreadsheet != nil else { return }
+        print("🧹 Clearing data...")
+        try await spreadsheet!.clearValues(range: SheetRange(parsing: "\(demoSheetName)!A2:F"))
+        print("✅ Cleared.")
+    }
+    
+    mutating func resizeSheet() async throws {
+        guard spreadsheet != nil else { return }
+        let name = demoSheetName
+        
+        guard let sheet = try? spreadsheet!.sheet(named: name) else {
+            print("❌ Sheet '\(name)' not found")
+            return
+        }
+        
+        print("Enter new Row Count (current: \(sheet.properties.gridProperties.rowCount)): ", terminator: "")
+        let rows = Int(readLine() ?? "") ?? 100
+        print("Enter new Column Count (current: \(sheet.properties.gridProperties.columnCount)): ", terminator: "")
+        let cols = Int(readLine() ?? "") ?? 26
+        
+        print("📏 Resizing to \(rows)x\(cols)...")
+        try await spreadsheet!.batchUpdate {
+            ResizeSheet(sheet: sheet, rows: rows, columns: cols)
+        }
+        try await spreadsheet!.refreshMetadata()
+        print("✅ Resized.")
     }
 }
