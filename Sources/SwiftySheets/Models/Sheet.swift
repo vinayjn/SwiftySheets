@@ -326,8 +326,10 @@ public struct GridRange: Codable {
     }
     
     public init(range: String, sheetId: Int) {
-        let sheetRange = SheetRange(stringLiteral: range)
-        
+        self.init(sheetRange: SheetRange(parsing: range), sheetId: sheetId)
+    }
+    
+    public init(sheetRange: SheetRange, sheetId: Int) {
         let startRowIndex = sheetRange.startRow.map { $0.value - 1 }
         
         var endRowIndex: Int? = sheetRange.endRow?.value

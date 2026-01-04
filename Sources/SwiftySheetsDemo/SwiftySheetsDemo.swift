@@ -86,7 +86,7 @@ struct SwiftySheetsDemo {
                  backgroundColor: .blue,
                  textFormat: TextFormat(foregroundColor: .white, bold: true)
              )
-             try await spreadsheet.format(range: "DemoSheet!A1:F1", format: headerFormat)
+             try await spreadsheet.format(range: #Range("DemoSheet!A1:F1"), format: headerFormat)
              print("✅ Header formatted.")
              
              // 5. Type-Safe Write using Macros
@@ -108,7 +108,7 @@ struct SwiftySheetsDemo {
             let values = try users.map { try $0.encodeRow() }
             
             try await spreadsheet.updateValues(
-                range: "DemoSheet!A2",
+                range: #Range("DemoSheet!A2"),
                 values: values
             )
             print("✅ Users written.")
@@ -119,7 +119,7 @@ struct SwiftySheetsDemo {
             let newUser = DemoUser(name: "Charlie", email: "charlie@test.com", score: 50, isActive: true, joinDate: date3, nickname: "Chuck")
             
             try await spreadsheet.appendValues(
-                range: "DemoSheet!A1",
+                range: #Range("DemoSheet!A1"),
                 values: [try newUser.encodeRow()]
             )
             print("✅ User appended.")
@@ -139,7 +139,7 @@ struct SwiftySheetsDemo {
             // 7. Type-Safe Read
             print("📖 [Type-Safe] Reading all users...")
             var readUsers = try await spreadsheet.values(
-                range: "DemoSheet!A2:F", // Read columns A to F
+                range: #Range("DemoSheet!A2:F"), // Read columns A to F
                 type: DemoUser.self
             )
             
@@ -151,15 +151,15 @@ struct SwiftySheetsDemo {
             
             // 8. Sorting
             print("🔃 Sorting by Score (Column C, Index 2)...")
-            try await spreadsheet.sort(range: "DemoSheet!A2:F", column: 2, ascending: false)
+            try await spreadsheet.sort(range: #Range("DemoSheet!A2:F"), column: 2, ascending: false)
             print("✅ Sorted.")
             
-            readUsers = try await spreadsheet.values(range: "DemoSheet!A2:F", type: DemoUser.self)
+            readUsers = try await spreadsheet.values(range: #Range("DemoSheet!A2:F"), type: DemoUser.self)
             print("   Top Scorer: \(readUsers.first?.name ?? "None")")
 
             // 9. Clear Values
             print("🧹 Clearing data...")
-            try await spreadsheet.clearValues(range: "DemoSheet!A2:F")
+            try await spreadsheet.clearValues(range: #Range("DemoSheet!A2:F"))
             print("✅ Data cleared.")
             
             // 12. Clean up

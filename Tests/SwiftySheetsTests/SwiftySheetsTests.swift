@@ -79,7 +79,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         let mockValueRange = ValueRange(range: "A11", values: [["Liquid Cash"]])
         mockSession.mockData = try JSONEncoder().encode(mockValueRange)
         
-        let values = try await spreadsheet.values(range: "A11")
+        let values = try await spreadsheet.values(range: #Range("A11"))
         XCTAssertEqual(values, [["Liquid Cash"]])
     }
 
@@ -336,7 +336,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
 
     func testSheetRange() {
         // Test String Literal Parsing
-        let range1: SheetRange = "Sheet1!A1:B2"
+        let range1 = SheetRange(parsing: "Sheet1!A1:B2")
         XCTAssertEqual(range1.sheetName, "Sheet1")
         XCTAssertEqual(range1.startColumn, "A")
         XCTAssertEqual(range1.startRow, 1)
@@ -344,7 +344,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(range1.endRow, 2)
         XCTAssertEqual(range1.description, "Sheet1!A1:B2")
         
-        let range2: SheetRange = "Sheet2!C5"
+        let range2 = SheetRange(parsing: "Sheet2!C5")
         XCTAssertEqual(range2.sheetName, "Sheet2")
         XCTAssertEqual(range2.startColumn, "C")
         XCTAssertEqual(range2.startRow, 5)
@@ -352,7 +352,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         XCTAssertNil(range2.endRow)
         XCTAssertEqual(range2.description, "Sheet2!C5")
         
-        let range3: SheetRange = "A1:Z100" // No sheet name
+        let range3 = SheetRange(parsing: "A1:Z100") // No sheet name
         XCTAssertNil(range3.sheetName)
         XCTAssertEqual(range3.startColumn, "A")
         XCTAssertEqual(range3.startRow, 1)
@@ -364,7 +364,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         let range4 = SheetRange(sheetName: "Sheet3", startColumn: "AA", startRow: 10)
         XCTAssertEqual(range4.description, "Sheet3!AA10")
         
-        let range5 = SheetRange(stringLiteral: "WrongFormat")
+        let range5 = SheetRange(parsing: "WrongFormat")
         XCTAssertNil(range5.sheetName)
         XCTAssertEqual(range5.startColumn, "WrongFormat")
         XCTAssertNil(range5.startRow)
@@ -435,7 +435,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         
         let users = [try TestUser(row: ["Alice", "a@b.com", "10"])]
         
-        _ = try await client.spreadsheet(id: "id").updateValues(range: "A1", values: users)
+        _ = try await client.spreadsheet(id: "id").updateValues(range: #Range("A1"), values: users)
     }
     
     func testTypeSafeAppendValues() async throws {
@@ -454,7 +454,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         
         let users = [try TestUser(row: ["Bob", "b@c.com", "20"])]
         
-        _ = try await client.spreadsheet(id: "id").appendValues(range: "A1", values: users)
+        _ = try await client.spreadsheet(id: "id").appendValues(range: #Range("A1"), values: users)
     }
 
 
@@ -533,7 +533,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         mockSession.mockData = try JSONEncoder().encode(BatchUpdateResponse(spreadsheetId: TestConstants.spreadsheetID))
         
         let format = CellFormat(backgroundColor: .red)
-        try await spreadsheet.format(range: "Sheet1!A1", format: format)
+        try await spreadsheet.format(range: #Range("Sheet1!A1"), format: format)
         
         // We assume success if no error thrown and request structure is correct (which we can't fully inspect without a spy, but encoding is checked).
     }
@@ -568,7 +568,7 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         mockSession.mockResponse = mockResponse
         mockSession.mockData = try JSONEncoder().encode(BatchUpdateResponse(spreadsheetId: TestConstants.spreadsheetID))
         
-        try await spreadsheet.sort(range: "Sheet1!A1:C10", column: 0, ascending: true)
+        try await spreadsheet.sort(range: #Range("Sheet1!A1:C10"), column: 0, ascending: true)
     }
     
     func testCellAccess() async throws {
@@ -613,8 +613,8 @@ final class SwiftySheetsTests: XCTestCase, @unchecked Sendable {
         let sheet = Sheet(properties: sheetProps)
         
         let requests = BatchUpdateBuilder.buildBlock(
-            FormatCells(sheet: sheet, range: "A1", format: CellFormat(backgroundColor: .red)),
-            SortRange(sheet: sheet, range: "A2:C", column: 0),
+            FormatCells(sheet: sheet, range: #Range("A1"), format: CellFormat(backgroundColor: .red)),
+            SortRange(sheet: sheet, range: #Range("A2:C"), column: 0),
             ResizeSheet(sheet: sheet, rows: 50, columns: 5)
         )
         

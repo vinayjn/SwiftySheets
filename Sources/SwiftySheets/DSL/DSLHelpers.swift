@@ -12,14 +12,14 @@ public func DeleteSheet(id: Int) -> BatchUpdateRequest.Request {
 
 // More helpers can be added for UpdateCells etc.
 
-public func FormatCells(sheet: Sheet, range: String, format: CellFormat) -> BatchUpdateRequest.Request {
-    let gridRange = GridRange(range: range, sheetId: sheet.sheetId)
+public func FormatCells(sheet: Sheet, range: SheetRange, format: CellFormat) -> BatchUpdateRequest.Request {
+    let gridRange = GridRange(sheetRange: range, sheetId: sheet.sheetId)
     let cellData = CellData(userEnteredFormat: format)
     return .repeatCell(RepeatCellRequest(range: gridRange, cell: cellData, fields: "userEnteredFormat"))
 }
 
-public func SortRange(sheet: Sheet, range: String, column: Int, ascending: Bool = true) -> BatchUpdateRequest.Request {
-    let gridRange = GridRange(range: range, sheetId: sheet.sheetId)
+public func SortRange(sheet: Sheet, range: SheetRange, column: Int, ascending: Bool = true) -> BatchUpdateRequest.Request {
+    let gridRange = GridRange(sheetRange: range, sheetId: sheet.sheetId)
     let sortSpec = SortSpec(
         dimensionIndex: column,
         sortOrder: ascending ? .ascending : .descending

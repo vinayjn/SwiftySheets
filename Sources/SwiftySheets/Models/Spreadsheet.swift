@@ -40,13 +40,13 @@ private extension Spreadsheet {
 
 public extension Spreadsheet {
     func values(
-        range: String,
+        range: SheetRange,
         valueRenderOption: ValueRenderOption = .unformatted,
         dateTimeRenderOption: DateRenderOption = .serialNumber
     ) async throws -> [[String]] {
         let request = try Endpoint.values(
             spreadsheetId: id,
-            range: range,
+            range: range.description,
             valueRenderOption: valueRenderOption.rawValue,
             dateTimeRenderOption: dateTimeRenderOption.rawValue
         ).request()
@@ -71,35 +71,44 @@ public extension Spreadsheet {
         return sheet
     }
     
+    @discardableResult
     func updateValues(
-        range: String,
+        range: SheetRange,
         values: [[String]],
         valueInputOption: ValueInputOption = .userEntered
     ) async throws -> UpdateValuesResponse {
         try await client.updateValues(
             spreadsheetId: id,
-            range: range,
-            values: values,
-            valueInputOption: valueInputOption
-        )
-    }
-    
-    func appendValues(
-        range: String,
-        values: [[String]],
-        valueInputOption: ValueInputOption = .userEntered
-    ) async throws -> UpdateValuesResponse {
-        try await client.appendValues(
-            spreadsheetId: id,
-            range: range,
+            range: range.description,
             values: values,
             valueInputOption: valueInputOption
         )
     }
     
     @discardableResult
+    func appendValues(
+        range: SheetRange,
+        values: [[String]],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        try await client.appendValues(
+            spreadsheetId: id,
+            range: range.description,
+            values: values,
+            valueInputOption: valueInputOption
+        )
+    }
+    
+    // MARK: - Batch Update
+    
+    @discardableResult
     func batchUpdate(requests: [BatchUpdateRequest.Request]) async throws -> BatchUpdateResponse {
         return try await client.batchUpdate(spreadsheetId: id, requests: requests)
+    }
+    
+    @discardableResult
+    func batchUpdate(@BatchUpdateBuilder _ builder: @Sendable () -> [BatchUpdateRequest.Request]) async throws -> BatchUpdateResponse {
+        try await batchUpdate(requests: builder())
     }
     
     func addSheet(title: String, rowCount: Int = 1000, columnCount: Int = 26) async throws {
@@ -111,8 +120,10 @@ public extension Spreadsheet {
         try await batchUpdate(requests: [request])
     }
     
+    // MARK: - Generic Codable Helpers
+    
     func values<T: SheetRowDecodable>(
-        range: String,
+        range: SheetRange,
         type: T.Type,
         valueRenderOption: ValueRenderOption = .unformatted,
         dateTimeRenderOption: DateRenderOption = .serialNumber
@@ -124,15 +135,10 @@ public extension Spreadsheet {
         )
         return try rawValues.map { try T(row: $0) }
     }
-
-    @discardableResult
-    func batchUpdate(@BatchUpdateBuilder _ builder: @Sendable () -> [BatchUpdateRequest.Request]) async throws -> BatchUpdateResponse {
-        try await batchUpdate(requests: builder())
-    }
     
     @discardableResult
     func updateValues<T: SheetRowEncodable>(
-        range: String,
+        range: SheetRange,
         values: [T],
         valueInputOption: ValueInputOption = .userEntered
     ) async throws -> UpdateValuesResponse {
@@ -146,7 +152,7 @@ public extension Spreadsheet {
     
     @discardableResult
     func appendValues<T: SheetRowEncodable>(
-        range: String,
+        range: SheetRange,
         values: [T],
         valueInputOption: ValueInputOption = .userEntered
     ) async throws -> UpdateValuesResponse {
@@ -158,7 +164,9 @@ public extension Spreadsheet {
         )
     }
     
-    func format(range: String, format: CellFormat) async throws {
+    // MARK: - Advanced Operations
+    
+    func format(range: SheetRange, format: CellFormat) async throws {
         let gridRange = try resolveGridRange(from: range)
         
         let cellData = CellData(userEnteredFormat: format)
@@ -169,7 +177,7 @@ public extension Spreadsheet {
         try await batchUpdate(requests: [request])
     }
     
-    func sort(range: String, column: Int, ascending: Bool = true) async throws {
+    func sort(range: SheetRange, column: Int, ascending: Bool = true) async throws {
         let gridRange = try resolveGridRange(from: range)
         let sortSpec = SortSpec(
             dimensionIndex: column,
@@ -181,38 +189,35 @@ public extension Spreadsheet {
         try await batchUpdate(requests: [request])
     }
     
+    @discardableResult
+    func clearValues(range: SheetRange) async throws -> ClearValuesResponse {
+        try await client.clearValues(spreadsheetId: id, range: range.description)
+    }
+    
     // MARK: - Developer Experience
     
-    func cell(_ range: String) async throws -> String? {
+    func cell(_ range: SheetRange) async throws -> String? {
         let values = try await self.values(range: range)
         return values.first?.first
     }
     
     func cell(row: Int, column: Int) async throws -> String? {
         // row is 1-based, column is 1-based.
-        // Convert to A1.
-        // Col 1 -> index 0 -> "A"
         let colStr = SheetRange.indexToColumn(column - 1)
-        let range = "\(colStr)\(row)"
-        // If sheet name? This assumes active sheet or default?
-        // The API `cell(_ range)` uses Range string which can contain sheet name.
-        // If row/col is used, we usually imply the first sheet or need a sheet name argument.
-        // Let's assume default sheet for now or require sheet name in a separate overload if needed.
-        // For DX, simpliest is default.
-        return try await cell(range)
+        // Construction using parsing init for safety or direct range?
+        // We can just construct a SheetRange.
+        let r = SheetRange.root().from(col: SheetColumn(colStr), row: SheetRowIndex(row))
+        return try await cell(r)
     }
     
     // Access with Sheet Name
     func cell(sheet: String, row: Int, column: Int) async throws -> String? {
         let colStr = SheetRange.indexToColumn(column - 1)
-        let range = "\(sheet)!\(colStr)\(row)"
-        return try await cell(range)
+        let r = SheetRange.root(sheet).from(col: SheetColumn(colStr), row: SheetRowIndex(row))
+        return try await cell(r)
     }
 
     func resize(sheetId: Int, rows: Int, columns: Int) async throws {
-        // Need to find existing properties to preserve index/title?
-        // No, UpdateSheetProperties with fields="gridProperties" only updates those fields.
-        // But we need the sheetId in the properties object.
         let gridProps = Sheet.GridProperties(rowCount: rows, columnCount: columns)
         let props = Sheet.SheetProperties(
             sheetId: sheetId,
@@ -226,9 +231,7 @@ public extension Spreadsheet {
         try await batchUpdate(requests: [request])
     }
 
-    private func resolveGridRange(from range: String) throws -> GridRange {
-        let sheetRange = SheetRange(stringLiteral: range)
-        
+    private func resolveGridRange(from sheetRange: SheetRange) throws -> GridRange {
         // 1. Resolve Sheet ID
         let sheetId: Int
         if let name = sheetRange.sheetName {
@@ -240,61 +243,7 @@ public extension Spreadsheet {
              sheetId = first.properties.sheetId
         }
         
-        return GridRange(range: range, sheetId: sheetId)
-    }
-    
-    @discardableResult
-    func clearValues(range: String) async throws -> ClearValuesResponse {
-        try await client.clearValues(spreadsheetId: id, range: range)
-    }
-    // MARK: - SheetRange Overloads
-    
-    func values(
-        range: SheetRange,
-        valueRenderOption: ValueRenderOption = .unformatted,
-        dateTimeRenderOption: DateRenderOption = .serialNumber
-    ) async throws -> [[String]] {
-        try await values(range: range.description, valueRenderOption: valueRenderOption, dateTimeRenderOption: dateTimeRenderOption)
-    }
-    
-    func updateValues(
-        range: SheetRange,
-        values: [[String]],
-        valueInputOption: ValueInputOption = .userEntered
-    ) async throws -> UpdateValuesResponse {
-        try await updateValues(range: range.description, values: values, valueInputOption: valueInputOption)
-    }
-    
-    @discardableResult
-    func updateValues<T: SheetRowEncodable>(
-        range: SheetRange,
-        values: [T],
-        valueInputOption: ValueInputOption = .userEntered
-    ) async throws -> UpdateValuesResponse {
-        let encodedValues = try values.map { try $0.encodeRow() }
-        return try await updateValues(range: range.description, values: encodedValues, valueInputOption: valueInputOption)
-    }
-
-    func appendValues(
-        range: SheetRange,
-        values: [[String]],
-        valueInputOption: ValueInputOption = .userEntered
-    ) async throws -> UpdateValuesResponse {
-        try await appendValues(range: range.description, values: values, valueInputOption: valueInputOption)
-    }
-    
-    @discardableResult
-    func appendValues<T: SheetRowEncodable>(
-        range: SheetRange,
-        values: [T],
-        valueInputOption: ValueInputOption = .userEntered
-    ) async throws -> UpdateValuesResponse {
-        let encodedValues = try values.map { try $0.encodeRow() }
-        return try await appendValues(range: range.description, values: encodedValues, valueInputOption: valueInputOption)
-    }
-    
-    @discardableResult
-    func clearValues(range: SheetRange) async throws -> ClearValuesResponse {
-        try await clearValues(range: range.description)
+        // GridRange init(sheetRange:sheetId) reuses the resolution logic.
+        return GridRange(sheetRange: sheetRange, sheetId: sheetId)
     }
 }

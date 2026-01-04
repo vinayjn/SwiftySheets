@@ -38,7 +38,7 @@ final class SheetRangeDSLTests: XCTestCase {
     
     func testStringLiteralParsing() {
         // Full range
-        let range1: SheetRange = "Sheet1!A1:B2"
+        let range1 = SheetRange(parsing: "Sheet1!A1:B2")
         XCTAssertEqual(range1.sheetName, "Sheet1")
         XCTAssertEqual(range1.startColumn?.value, "A")
         XCTAssertEqual(range1.startRow?.value, 1)
@@ -47,7 +47,7 @@ final class SheetRangeDSLTests: XCTestCase {
         XCTAssertEqual(range1.description, "Sheet1!A1:B2")
         
         // Single cell
-        let range2: SheetRange = "A1"
+        let range2 = SheetRange(parsing: "A1")
         XCTAssertNil(range2.sheetName)
         XCTAssertEqual(range2.startColumn?.value, "A")
         XCTAssertEqual(range2.startRow?.value, 1)
@@ -56,7 +56,7 @@ final class SheetRangeDSLTests: XCTestCase {
         
         // Column only (open row) constraint not strictly enforced by parser, but struct structure:
         // "A:B" -> Parsed as Start(A) End(B) with rows nil
-        let range3: SheetRange = "A:B"
+        let range3 = SheetRange(parsing: "A:B")
         XCTAssertEqual(range3.startColumn?.value, "A")
         XCTAssertNil(range3.startRow)
         XCTAssertEqual(range3.endColumn?.value, "B")
@@ -64,7 +64,7 @@ final class SheetRangeDSLTests: XCTestCase {
         
         // Sheet only? No, SheetRange expects range part usually or single part is parsed as cell.
         // "Sheet1!A1"
-        let range4: SheetRange = "Sheet1!A1"
+        let range4 = SheetRange(parsing: "Sheet1!A1")
         XCTAssertEqual(range4.sheetName, "Sheet1")
         XCTAssertEqual(range4.startColumn?.value, "A")
     }

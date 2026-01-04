@@ -1,6 +1,6 @@
 import Foundation
 
-public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByStringLiteral {
+public struct SheetRange: Sendable, CustomStringConvertible {
     public let sheetName: String?
     public let startColumn: SheetColumn?
     public let startRow: SheetRowIndex?
@@ -21,9 +21,9 @@ public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByString
         self.endRow = endRow
     }
     
-
-    
-    public init(stringLiteral value: String) {
+    /// explicitly Parse a string at runtime (e.g. "Sheet1!A1:B2").
+    /// Use this for dynamic content. For static content, use `#Range("...")`.
+    public init(parsing value: String) {
         // Format: Sheet1!A1:B2 or A1:B2 or Sheet1!A1
         let parts = value.components(separatedBy: "!")
         
