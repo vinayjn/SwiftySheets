@@ -62,24 +62,25 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
                 $0.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == "Column"
             }), let args = attribute.as(AttributeSyntax.self)?.arguments?.as(LabeledExprListSyntax.self) {
                  
-                // Iterate arguments to find index/name and format
+                // Iterate arguments to find name and format
                 for arg in args {
                     if let label = arg.label?.text {
-                        if label == "index" {
-                             if let val = arg.expression.as(IntegerLiteralExprSyntax.self)?.literal.text {
-                                columnIndex = Int(val) ?? 0
-                            }
-                        } else if label == "format" {
+                        if label == "format" {
                             if let val = arg.expression.as(StringLiteralExprSyntax.self)?.segments.first?.as(StringSegmentSyntax.self)?.content.text {
                                 dateFormat = val
                             }
                         }
                     } else {
-                        // Unlabeled argument -> name string or index?
+                        // Unlabeled argument -> name string
                         if let stringLiteral = arg.expression.as(StringLiteralExprSyntax.self)?.segments.first?.as(StringSegmentSyntax.self)?.content.text {
-                            columnIndex = columnLetterToIndex(stringLiteral)
-                        } else if let intLiteral = arg.expression.as(IntegerLiteralExprSyntax.self)?.literal.text {
-                            columnIndex = Int(intLiteral) ?? 0
+                            do {
+                                columnIndex = try columnLetterToIndex(stringLiteral)
+                            } catch let error as MacroError {
+                                context.diagnose(Diagnostic(node: arg, message: SimpleDiagnosticMessage(message: error.message, diagnosticID: MessageID(domain: "SwiftySheets", id: "InvalidColumn"), severity: .error)))
+                                return []
+                            } catch {
+                                return []
+                            }
                         }
                     }
                 }
@@ -251,13 +252,23 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
         return [DeclSyntax(stringLiteral: initDecl), DeclSyntax(stringLiteral: encodeDecl), DeclSyntax(stringLiteral: memberwiseInit)]
     }
     
-    private static func columnLetterToIndex(_ letter: String) -> Int {
+    private static func columnLetterToIndex(_ letter: String) throws -> Int {
+        guard !letter.isEmpty else {
+             throw MacroError(message: "Column name cannot be empty")
+        }
         var column = 0
         for char in letter.uppercased().unicodeScalars {
+            guard char.value >= 65 && char.value <= 90 else { // A-Z
+                throw MacroError(message: "Invalid column name '\(letter)'. use letters A-Z.")
+            }
             column = column * 26 + (Int(char.value) - 64)
         }
         return column - 1
     }
+}
+
+struct MacroError: Error {
+    let message: String
 }
 
 public struct ColumnMacro: PeerMacro {
