@@ -112,12 +112,9 @@ public extension Spreadsheet {
     }
     
     func addSheet(title: String, rowCount: Int = 1000, columnCount: Int = 26) async throws {
-        let properties = Sheet.Draft(
-            title: title,
-            gridProperties: Sheet.GridProperties(rowCount: rowCount, columnCount: columnCount)
-        )
-        let request = BatchUpdateRequest.Request.addSheet(AddSheetRequest(properties: properties))
-        try await batchUpdate(requests: [request])
+
+        let request = AddSheet(title, gridProperties: Sheet.GridProperties(rowCount: rowCount, columnCount: columnCount))
+        try await batchUpdate(requests: [request.request])
     }
     
     // MARK: - Generic Codable Helpers
@@ -167,26 +164,29 @@ public extension Spreadsheet {
     // MARK: - Advanced Operations
     
     func format(range: SheetRange, format: CellFormat) async throws {
-        let gridRange = try resolveGridRange(from: range)
+        let sheet = try resolveSheet(for: range)
         
-        let cellData = CellData(userEnteredFormat: format)
-        let request = BatchUpdateRequest.Request.repeatCell(
-            RepeatCellRequest(range: gridRange, cell: cellData, fields: "userEnteredFormat")
+        // Use updated DSL dot syntax
+        let request = FormatCells(
+            sheet: sheet,
+            range: range,
+            format: format
         )
         
-        try await batchUpdate(requests: [request])
+        try await batchUpdate(requests: [request.request])
     }
     
     func sort(range: SheetRange, column: Int, ascending: Bool = true) async throws {
-        let gridRange = try resolveGridRange(from: range)
-        let sortSpec = SortSpec(
-            dimensionIndex: column,
-            sortOrder: ascending ? .ascending : .descending
+        let sheet = try resolveSheet(for: range)
+        
+        // Use updated DSL dot syntax
+        let request = SortRange(
+            sheet: sheet,
+            range: range,
+            column: column,
+            ascending: ascending
         )
-        let request = BatchUpdateRequest.Request.sortRange(
-            SortRangeRequest(range: gridRange, sortSpecs: [sortSpec])
-        )
-        try await batchUpdate(requests: [request])
+        try await batchUpdate(requests: [request.request])
     }
     
     @discardableResult
@@ -218,32 +218,23 @@ public extension Spreadsheet {
     }
 
     func resize(sheetId: Int, rows: Int, columns: Int) async throws {
-        let gridProps = Sheet.GridProperties(rowCount: rows, columnCount: columns)
-        let props = Sheet.SheetProperties(
-            sheetId: sheetId,
-            title: "", // Ignored by fields mask
-            index: 0, // Ignored
-            gridProperties: gridProps
+
+        let request = ResizeSheet(
+            sheet: Sheet(properties: Sheet.SheetProperties(sheetId: sheetId, title: "", index: 0, gridProperties: Sheet.GridProperties(rowCount: 0, columnCount: 0))),
+            rows: rows,
+            columns: columns
         )
-        let request = BatchUpdateRequest.Request.updateSheetProperties(
-            UpdateSheetPropertiesRequest(properties: props, fields: "gridProperties")
-        )
-        try await batchUpdate(requests: [request])
+        try await batchUpdate(requests: [request.request])
     }
 
-    private func resolveGridRange(from sheetRange: SheetRange) throws -> GridRange {
-        // 1. Resolve Sheet ID
-        let sheetId: Int
-        if let name = sheetRange.sheetName {
-            sheetId = try sheet(named: name).properties.sheetId
+    private func resolveSheet(for range: SheetRange) throws -> Sheet {
+        if let name = range.sheetName {
+            return try sheet(named: name)
         } else {
              guard let first = metadata.sheets.first else {
                  throw SheetsError.spreadsheetNotFound(message: "No sheets found")
              }
-             sheetId = first.properties.sheetId
+             return first
         }
-        
-        // GridRange init(sheetRange:sheetId) reuses the resolution logic.
-        return GridRange(sheetRange: sheetRange, sheetId: sheetId)
     }
 }

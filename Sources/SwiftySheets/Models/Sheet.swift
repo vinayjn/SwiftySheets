@@ -239,8 +239,8 @@ public struct UpdateCellsRequest: Codable {
     public let rows: [RowData]
     public let fields: String
     
-    public init(range: GridRange, rows: [RowData], fields: String = "*") {
-        self.range = range
+    public init(sheet: Sheet, range: SheetRange, rows: [RowData], fields: String = "*") {
+        self.range = GridRange(sheetRange: range, sheetId: sheet.sheetId)
         self.rows = rows
         self.fields = fields
     }
@@ -277,8 +277,8 @@ public struct SortRangeRequest: Codable {
     public let range: GridRange
     public let sortSpecs: [SortSpec]
     
-    public init(range: GridRange, sortSpecs: [SortSpec]) {
-        self.range = range
+    public init(sheet: Sheet, range: SheetRange, sortSpecs: [SortSpec]) {
+        self.range = GridRange(sheetRange: range, sheetId: sheet.sheetId)
         self.sortSpecs = sortSpecs
     }
 }
@@ -303,8 +303,8 @@ public struct RepeatCellRequest: Codable {
     public let cell: CellData
     public let fields: String
     
-    public init(range: GridRange, cell: CellData, fields: String) {
-        self.range = range
+    public init(sheet: Sheet, range: SheetRange, cell: CellData, fields: String) {
+        self.range = GridRange(sheetRange: range, sheetId: sheet.sheetId)
         self.cell = cell
         self.fields = fields
     }
@@ -325,7 +325,7 @@ public struct GridRange: Codable {
         self.endColumnIndex = endColumnIndex
     }
     
-    public init(range: String, sheetId: Int) {
+    internal init(range: String, sheetId: Int) {
         self.init(sheetRange: SheetRange(parsing: range), sheetId: sheetId)
     }
     

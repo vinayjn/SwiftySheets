@@ -27,6 +27,10 @@ public struct BatchUpdateBuilder {
         [expression]
     }
     
+    public static func buildExpression(_ expression: BatchRequestConvertible) -> [BatchUpdateRequest.Request] {
+        [expression.request]
+    }
+    
     public static func buildExpression(_ expression: [BatchUpdateRequest.Request]) -> [BatchUpdateRequest.Request] {
         expression
     }
