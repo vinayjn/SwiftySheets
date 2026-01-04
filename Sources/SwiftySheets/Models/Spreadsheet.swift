@@ -247,4 +247,52 @@ public extension Spreadsheet {
     func clearValues(range: String) async throws -> ClearValuesResponse {
         try await client.clearValues(spreadsheetId: id, range: range)
     }
+    // MARK: - SheetRange Overloads
+    
+    func values(
+        range: SheetRange,
+        valueRenderOption: ValueRenderOption = .unformatted,
+        dateTimeRenderOption: DateRenderOption = .serialNumber
+    ) async throws -> [[String]] {
+        try await values(range: range.description, valueRenderOption: valueRenderOption, dateTimeRenderOption: dateTimeRenderOption)
+    }
+    
+    func updateValues(
+        range: SheetRange,
+        values: [[String]],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        try await updateValues(range: range.description, values: values, valueInputOption: valueInputOption)
+    }
+    
+    @discardableResult
+    func updateValues<T: SheetRowEncodable>(
+        range: SheetRange,
+        values: [T],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        try await updateValues(range: range, values: values, valueInputOption: valueInputOption)
+    }
+
+    func appendValues(
+        range: SheetRange,
+        values: [[String]],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        try await appendValues(range: range.description, values: values, valueInputOption: valueInputOption)
+    }
+    
+    @discardableResult
+    func appendValues<T: SheetRowEncodable>(
+        range: SheetRange,
+        values: [T],
+        valueInputOption: ValueInputOption = .userEntered
+    ) async throws -> UpdateValuesResponse {
+        try await appendValues(range: range.description, values: values, valueInputOption: valueInputOption)
+    }
+    
+    @discardableResult
+    func clearValues(range: SheetRange) async throws -> ClearValuesResponse {
+        try await clearValues(range: range.description)
+    }
 }

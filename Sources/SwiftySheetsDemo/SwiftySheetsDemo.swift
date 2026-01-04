@@ -49,6 +49,7 @@ struct SwiftySheetsDemo {
             print("PAGE: Adding a new sheet 'DemoSheet'...")
             
             // Check if it exists first and delete (Clean Slate)
+
             if let existingSheet = try? spreadsheet.sheet(named: "DemoSheet") {
                 let idToDelete = existingSheet.properties.sheetId
                 print("⚠️ 'DemoSheet' already exists. Deleting it first...")
@@ -75,7 +76,7 @@ struct SwiftySheetsDemo {
             // 4. Raw Data Operations (Headers)
             print("📝 [Raw] Writing header row...")
             _ = try await spreadsheet.updateValues(
-                range: "DemoSheet!A1:F1",
+                range: #Range("DemoSheet!A1:F1"),
                 values: [["Name", "Email", "Score", "Active", "Joined", "Nickname"]]
             )
             
@@ -123,6 +124,18 @@ struct SwiftySheetsDemo {
             )
             print("✅ User appended.")
             
+            // 9. DX: Sheet Properties & Fluent Range
+            let props = try spreadsheet.sheet(named: "DemoSheet").properties
+            print("📊 Sheet ID: \(props.sheetId), Index: \(props.index), Rows: \(props.gridProperties.rowCount)")
+            
+            // Fluent Range Builder Example
+            let fluentRange = SheetRange.root("DemoSheet")
+                .from(col: "A", row: 2)
+                .to(col: "Z")
+            print("🏗️ Fluent Range: \(fluentRange)") // Output: DemoSheet!A2:Z
+            
+            // 10. DX: Resize Sheet
+            print("📏 Resizing 'DemoSheet' to 50 rows x 5 columns...")
             // 7. Type-Safe Read
             print("📖 [Type-Safe] Reading all users...")
             var readUsers = try await spreadsheet.values(

@@ -112,3 +112,32 @@ public struct SheetRange: Sendable, CustomStringConvertible, ExpressibleByString
         return str
     }
 }
+
+// MARK: - Fluent Builder API
+
+public extension SheetRange {
+    static func root(_ sheet: String? = nil) -> SheetRange {
+        SheetRange(sheetName: sheet)
+    }
+    
+    func from(col: String? = nil, row: Int? = nil) -> SheetRange {
+        var range = self
+        if let c = col { range = SheetRange(sheetName: sheetName, startColumn: c, startRow: range.startRow, endColumn: range.endColumn, endRow: range.endRow) }
+        if let r = row { range = SheetRange(sheetName: sheetName, startColumn: range.startColumn, startRow: r, endColumn: range.endColumn, endRow: range.endRow) }
+        return range
+    }
+    
+    func to(col: String? = nil, row: Int? = nil) -> SheetRange {
+        var range = self
+        // If start is missing, this acts as end?
+        // Usually .from().to() implies start -> end.
+        // We set end properties.
+        return SheetRange(
+            sheetName: sheetName,
+            startColumn: startColumn,
+            startRow: startRow,
+            endColumn: col ?? endColumn,
+            endRow: row ?? endRow
+        )
+    }
+}

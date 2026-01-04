@@ -5,6 +5,7 @@ import SwiftSyntaxMacros
 struct SwiftySheetsMacrosPlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
         SheetRowMacro.self,
-        ColumnMacro.self
+        ColumnMacro.self,
+        RangeMacro.self
     ]
 }
