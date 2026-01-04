@@ -1,16 +1,16 @@
-# SwiftySheets
+# SwiftySheets 📊
 
-A modern, type-safe Swift library for interacting with Google Sheets API, built with Swift Concurrency and Macros.
+A modern, type-safe Swift library for interacting with the Google Sheets API. Built with **Swift Concurrency**, **Macros**, and a **Declarative DSL** to make spreadsheet automation strictly typed and effortless.
 
-## Features
+## ✨ Features
 
-- **Modern Concurrency**: Async/await based API.
-- **Type-Safe Macros**: `@SheetRow` and `@Column` macros for easy object mapping.
-- **Declarative DSL**: SwiftUI-like syntax for batch updates (e.g., creating sheets).
-- **Service Account Auth**: Secure server-side authentication.
-- **Comprehensive API**: Read, Write, Append, and Manage Sheets.
+- **🚀 Modern Concurrency**: Fully `async`/`await` powered.
+- **🛡️ Type-Safe Macros**: Map rows to structs securely with `@SheetRow` and `@Column`.
+- **🏗️ Declarative DSL**: Manage sheets using SwiftUI-like syntax (`AddSheet`, `FormatCells`).
+- **🔒 Strict Validation**: Compile-time safety for column names ("A", "B", etc).
+- **🔑 Secure Auth**: Built-in Service Account authentication.
 
-## Installation
+## 📦 Installation
 
 Add SwiftySheets to your `Package.swift`:
 
@@ -20,181 +20,90 @@ dependencies: [
 ]
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Setup Client
 
 ```swift
 import SwiftySheets
 
-let credentials = try ServiceAccountCredentials(jsonPath: "/path/to/service-account.json")
+let credentials = try ServiceAccountCredentials(jsonPath: "path/to/service-account.json")
 let client = Client(credentials: credentials)
 ```
 
-### 2. Access a Spreadsheet
+### 2. Define Your Model (Macros)
+
+Use `@SheetRow` to map Swift structs to spreadsheet rows effortlessly.
 
 ```swift
-let spreadsheet = try await client.spreadsheet(id: "your-spreadsheet-id")
-print("Title: \(spreadsheet.metadata.properties.title)")
-```
-
-### 3. Define Data Models (Macros)
-
-### 3. Define Data Models (Macros)
- 
- Use the `@SheetRow` macro to map Swift structs to spreadsheet rows. The macro handles all `Codable`, `Equatable`, and `Hashable` conformance automatically.
- 
- ```swift
- @SheetRow
- struct User {
-     @Column("A") var name: String
-     @Column("B") var email: String
-     @Column(index: 2) var score: Int
-     @Column("D") var isActive: Bool
-     @Column("E", format: "yyyy-MM-dd") var joinDate: Date
-     @Column("F") var nickname: String?
- }
- ```
- 
- **Supported Types:**
- - `String`, `String?`
- - `Int`, `Int?`
- - `Double`, `Double?`
- - `Bool`, `Bool?` (Maps to "TRUE"/"FALSE")
- - `Date`, `Date?` (Default: ISO8601, or custom via `format:`)
-
-### 4. Read Data
-
-```swift
-// Read rows as directly mapped objects
-let users = try await spreadsheet.values(
-    range: "Sheet1!A1:C",
-    type: User.self
-)
-
-for user in users {
-    print("\(user.name): \(user.score)")
+@SheetRow
+struct User {
+    @Column("A") var name: String
+    @Column("B") var email: String
+    @Column("C") var score: Int
+    @Column("D") var joinDate: Date? // Automatically handles ISO8601
 }
 ```
+*Note: `@Column` enforces strict A-Z notation validation at compile time!*
 
-### 5. Write Data
+### 3. Read & Write Data
 
 ```swift
-let newUsers = [
-    User(name: "Alice", email: "alice@example.com", score: 100),
-    User(name: "Bob", email: "bob@example.com", score: 95)
-]
+let spreadsheet = try await client.spreadsheet(id: "spreadsheet-id")
 
-// Encode objects to raw values
-let values = try newUsers.map { try $0.encodeRow() }
+// READ (Typesafe)
+let users = try await spreadsheet.values(range: "Sheet1!A:D", type: User.self)
 
-// Update values
-let result = try await spreadsheet.updateValues(
-    range: "Sheet1!A1",
-    values: values
-)
+// WRITE (Typesafe)
+let newUsers = [User(name: "Alice", email: "alice@test.com", score: 100, joinDate: Date())]
+try await spreadsheet.appendValues(range: "Sheet1!A1", values: newUsers)
 ```
 
-### 6. Manage Sheets (DSL)
+## 🛠️ Declarative DSL (Batch Updates)
 
-Use the declarative DSL for batch updates like adding or deleting sheets.
+SwiftySheets offers a declarative API for batch operations, similar to SwiftUI.
 
 ```swift
-// Add a new sheet and delete an old one in a single batch request
-let response = try await spreadsheet.batchUpdate {
-    AddSheet("Quarterly Report") {
-        GridProperties(rowCount: 100, columnCount: 20)
-        TabColor(red: 1.0, green: 0.0, blue: 0.0) // Red tab
-    }
+// Add a sheet, format header, and delete an old sheet in ONE request
+try await spreadsheet.batchUpdate {
+    AddSheet("Q1 Report")
     
-    DeleteSheet(id: oldSheetId)
+    FormatCells(sheet: q1Sheet, range: "A1:Z1", format: CellFormat(
+        backgroundColor: .blue,
+        textFormat: TextFormat(bold: true, foregroundColor: .white)
+    ))
+    
+    DeleteSheet(id: oldSheetID)
 }
 ```
 
-## Running the Demo
+## 🎨 Advanced Features
 
-This repository includes a CLI demo. To run it, you need a Google Service Account JSON file and a Spreadsheet ID.
+### Formatting
+```swift
+try await spreadsheet.format(range: "Sheet1!A1", format: CellFormat(backgroundColor: .red))
+```
+
+### Sorting & Clearing
+```swift
+try await spreadsheet.sort(range: "Sheet1!A2:C", column: 0, ascending: true)
+try await spreadsheet.clearValues(range: "Sheet1!D1:D100")
+```
+
+### Raw Access
+If you don't need models, you can always fall back to raw strings:
+```swift
+let rawValues: [[String]] = try await spreadsheet.values(range: "Sheet1!A1:B2")
+```
+
+## 🧪 Testing
+
+SwiftySheets includes a comprehensive test suite covering Unit, Integration, and Macro expansion.
 
 ```bash
-# Set environment variables
-export SWIFTYSHEETS_SERVICE_ACCOUNT_PATH="/path/to/your/service_account.json"
-export SWIFTYSHEETS_SPREADSHEET_ID="your_spreadsheet_id"
-
-# Run the demo
-swift run SwiftySheetsDemo
+swift test
 ```
 
-## Advanced Usage
-
-### Raw Values
-You can also read/write raw string arrays if you don't want to use Codable models.
-
-```swift
-let values = try await spreadsheet.values(range: "Sheet1!A1:B2")
-// values is [[String]]
-```
-
-### Append Data
-```swift
-try await spreadsheet.appendValues(
-    range: "Sheet1!A1",
-    values: [["New Entry", "123"]]
-)
-```
-
-### 7. Formatting & Styling
-
-Apply cell formatting like colors, bold text, and alignment.
-
-```swift
-let headerFormat = CellFormat(
-    backgroundColor: .blue,
-    textFormat: TextFormat(foregroundColor: .white, bold: true),
-    horizontalAlignment: .center
-)
-
-try await spreadsheet.format(range: "Sheet1!A1:Z1", format: headerFormat)
-```
-
-### 8. Advanced Operations
-
-#### Sorting & Clearing
-```swift
-// Clear values
-try await spreadsheet.clearValues(range: "Sheet1!A1:C10")
-
-// Sort range
-try await spreadsheet.sort(range: "Sheet1!A1:C10", column: 0, ascending: true)
-```
-
-#### Developer Experience Helpers
-We provide helpers for common tasks to avoid boilerplate.
-
-```swift
-// Easy Cell Access
-let val = try await spreadsheet.cell("Sheet1!A1")
-let val2 = try await spreadsheet.cell(row: 1, column: 1)
-
-// Resize Sheet
-try await spreadsheet.resize(sheetId: 123, rows: 1000, columns: 50)
-
-// Sheet Properties
-print("\(sheet.title): \(sheet.rowCount) rows")
-```
-
-### 9. Extended DSL
-The DSL supports advanced operations. Note that `Sheet` objects are required for context.
-
-```swift
-let sheet = try spreadsheet.sheet(named: "Report")
-
-try await spreadsheet.batchUpdate {
-    FormatCells(sheet: sheet, range: "A1:Z1", format: headerFormat)
-    SortRange(sheet: sheet, range: "A2:Z", column: 0)
-    ResizeSheet(sheet: sheet, rows: 50, columns: 10)
-}
-```
-
-## License
+## 📄 License
 
 MIT License. See [LICENSE](LICENSE) for details.
