@@ -54,11 +54,11 @@ struct User {
 let spreadsheet = try await client.spreadsheet(id: "spreadsheet-id")
 
 // READ (Type-Safe)
-let users: [User] = try await spreadsheet.values(range: "Sheet1!A:D")
+let users: [User] = try await spreadsheet.values(range: #Range("Sheet1!A:D"))
 
 // WRITE
 let newUsers = [User(name: "Alice", email: "alice@test.com", score: 100, joinDate: Date())]
-try await spreadsheet.appendValues(range: "Sheet1!A1", values: newUsers)
+try await spreadsheet.appendValues(range: #Range("Sheet1!A1"), values: newUsers)
 
 // SUBSCRIPTS
 let cellValue = try await spreadsheet["A1"]
