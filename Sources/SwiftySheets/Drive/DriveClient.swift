@@ -41,13 +41,11 @@ public struct DriveClient: Sendable {
     public enum FileType: Sendable {
         case spreadsheet
         case folder
-        case custom(String)
         
         var mimeType: String {
             switch self {
             case .spreadsheet: return "application/vnd.google-apps.spreadsheet"
             case .folder: return "application/vnd.google-apps.folder"
-            case .custom(let type): return type
             }
         }
     }
