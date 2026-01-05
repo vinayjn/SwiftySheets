@@ -29,4 +29,5 @@ public enum SheetsError: Error {
     case quotaExceeded(retryAfter: TimeInterval?)
     case permissionDenied(message: String)
     case rateLimitExceeded(retryAfter: TimeInterval?)
+    case invalidRange(message: String)
 }

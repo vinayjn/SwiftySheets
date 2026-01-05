@@ -202,18 +202,15 @@ public extension Spreadsheet {
     }
     
     func cell(row: Int, column: Int) async throws -> String? {
-        // row is 1-based, column is 1-based.
         let colStr = SheetRange.indexToColumn(column - 1)
-        // Construction using parsing init for safety or direct range?
-        // We can just construct a SheetRange.
-        let r = SheetRange.root().from(col: SheetColumn(colStr), row: SheetRowIndex(row))
+        let r = SheetRange.root().from(col: try SheetColumn(colStr), row: try SheetRowIndex(row))
         return try await cell(r)
     }
     
     // Access with Sheet Name
     func cell(sheet: String, row: Int, column: Int) async throws -> String? {
         let colStr = SheetRange.indexToColumn(column - 1)
-        let r = SheetRange.root(sheet).from(col: SheetColumn(colStr), row: SheetRowIndex(row))
+        let r = SheetRange.root(sheet).from(col: try SheetColumn(colStr), row: try SheetRowIndex(row))
         return try await cell(r)
     }
 

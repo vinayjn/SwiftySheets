@@ -21,9 +21,10 @@ public struct SheetRange: Sendable, CustomStringConvertible {
         self.endRow = endRow
     }
     
-    /// explicitly Parse a string at runtime (e.g. "Sheet1!A1:B2").
+    /// Parse a range string at runtime (e.g. "Sheet1!A1:B2").
     /// Use this for dynamic content. For static content, use `#Range("...")`.
-    public init(parsing value: String) {
+    /// Throws if the format is invalid.
+    public init(parsing value: String) throws {
         // Format: Sheet1!A1:B2 or A1:B2 or Sheet1!A1
         let parts = value.components(separatedBy: "!")
         
@@ -38,30 +39,26 @@ public struct SheetRange: Sendable, CustomStringConvertible {
         // Parse range: A1:B2
         let rangeParts = rangePart.components(separatedBy: ":")
         if rangeParts.count == 2 {
-            // Start and End
-            let start = Self.parseCell(rangeParts[0])
-            let end = Self.parseCell(rangeParts[1])
+            let start = try Self.parseCell(rangeParts[0])
+            let end = try Self.parseCell(rangeParts[1])
             
             self.startColumn = start.col
             self.startRow = start.row
             self.endColumn = end.col
             self.endRow = end.row
         } else if rangeParts.count == 1 {
-            // Just Start
-            let start = Self.parseCell(rangeParts[0])
+            let start = try Self.parseCell(rangeParts[0])
             self.startColumn = start.col
             self.startRow = start.row
             self.endColumn = nil
             self.endRow = nil
         } else {
-            self.startColumn = nil; self.startRow = nil
-            self.endColumn = nil; self.endRow = nil
+            throw SheetsError.invalidRange(message: "Invalid range format: '\(value)'")
         }
     }
     
     // Helper to convert "A" -> 0, "B" -> 1
     public static func columnToIndex(_ column: String) -> Int {
-        // Use SheetColumn validation logic if needed
         var result = 0
         for char in column.unicodeScalars {
             result = result * 26 + Int(char.value) - Int(UnicodeScalar("A").value) + 1
@@ -80,16 +77,22 @@ public struct SheetRange: Sendable, CustomStringConvertible {
         return col
     }
     
-    private static func parseCell(_ cell: String) -> (col: SheetColumn?, row: SheetRowIndex?) {
-        // Separate letters and numbers
+    private static func parseCell(_ cell: String) throws -> (col: SheetColumn?, row: SheetRowIndex?) {
         let letters = cell.filter { $0.isLetter }
         let numbers = cell.filter { $0.isNumber }
         
-        // Use initializers which validate.
-        let col = letters.isEmpty ? nil : SheetColumn(String(letters))
+        let col: SheetColumn?
+        if !letters.isEmpty {
+            col = try SheetColumn(String(letters))
+        } else {
+            col = nil
+        }
+        
         let row: SheetRowIndex?
-        if let n = Int(numbers) {
-            row = SheetRowIndex(n)
+        if let n = Int(numbers), n > 0 {
+            row = try SheetRowIndex(n)
+        } else if !numbers.isEmpty {
+            throw SheetsError.invalidRange(message: "Invalid row number: '\(numbers)'")
         } else {
             row = nil
         }
@@ -130,29 +133,21 @@ public extension SheetRange {
     
     func from(col: SheetColumn? = nil, row: SheetRowIndex? = nil) -> SheetRange {
         var range = self
-        // Note: Using primitive types directly!
         if let c = col { 
-            // Reconstruct with safe update
-             // We can use the init with typed args
-             range = range.with(startColumn: c)
+            range = range.with(startColumn: c)
         }
         if let r = row { 
-             range = range.with(startRow: r)
+            range = range.with(startRow: r)
         }
         return range
     }
     
     func to(col: SheetColumn? = nil, row: SheetRowIndex? = nil) -> SheetRange {
-        // We set end properties.
         var r = self
         if let c = col { r = r.with(endColumn: c) }
         if let rw = row { r = r.with(endRow: rw) }
         return r
     }
-    
-    // Compatibility Overloads for raw values (optional, but requested behavior is strict?)
-    // User requested: "col item should ONLY expect a Column"
-    // So removing String overloads forces usage of SheetColumn("A") or literal "A".
 }
 
 // Internal immutable setters
