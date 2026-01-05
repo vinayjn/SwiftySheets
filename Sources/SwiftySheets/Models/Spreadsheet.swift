@@ -181,6 +181,21 @@ public extension Spreadsheet {
         try await batchUpdate(requests: [request.request])
     }
     
+    /// Format cells using a declarative builder syntax:
+    /// ```
+    /// try await spreadsheet.format(#Range("A1:B10")) {
+    ///     BackgroundColor(.blue)
+    ///     Bold()
+    ///     FontSize(14)
+    /// }
+    /// ```
+    func format(
+        _ range: SheetRange,
+        @CellFormatBuilder _ builder: () -> CellFormat
+    ) async throws(SheetsError) {
+        try await format(range: range, format: builder())
+    }
+    
     func sort(range: SheetRange, column: Int, ascending: Bool = true) async throws(SheetsError) {
         let sheet = try resolveSheet(for: range)
         let request = SortRange(sheet: sheet, range: range, column: column, ascending: ascending)
@@ -237,5 +252,81 @@ public extension Spreadsheet {
             }
             return first
         }
+    }
+}
+
+// MARK: - Subscript Syntax (Convenience API)
+
+/// Provides convenient subscript access to cells.
+/// For type-safe operations, use the explicit method APIs.
+public extension Spreadsheet {
+    
+    /// Access a single cell value using A1 notation: `spreadsheet["A1"]`
+    subscript(_ a1Notation: String) -> CellAccessor {
+        CellAccessor(spreadsheet: self, notation: a1Notation)
+    }
+    
+    /// Access a single cell by row and column (1-indexed): `spreadsheet[1, 1]`
+    subscript(_ row: Int, _ column: Int) -> CellAccessor {
+        let colStr = SheetRange.indexToColumn(column - 1)
+        return CellAccessor(spreadsheet: self, notation: "\(colStr)\(row)")
+    }
+    
+    /// Access cells with a validated SheetRange: `spreadsheet[#Range("A1:B10")]`
+    subscript(_ range: SheetRange) -> RangeAccessor {
+        RangeAccessor(spreadsheet: self, range: range)
+    }
+}
+
+/// Accessor for single cell operations via subscript
+public struct CellAccessor: Sendable {
+    private let spreadsheet: Spreadsheet
+    private let notation: String
+    
+    init(spreadsheet: Spreadsheet, notation: String) {
+        self.spreadsheet = spreadsheet
+        self.notation = notation
+    }
+    
+    /// Get the cell value
+    public func get() async throws(SheetsError) -> String? {
+        guard let range = try? SheetRange(parsing: notation) else {
+            throw .invalidRange(message: "Invalid A1 notation: \(notation)")
+        }
+        return try await spreadsheet.cell(range)
+    }
+    
+    /// Set the cell value
+    public func set(_ value: String) async throws(SheetsError) {
+        guard let range = try? SheetRange(parsing: notation) else {
+            throw .invalidRange(message: "Invalid A1 notation: \(notation)")
+        }
+        try await spreadsheet.updateValues(range: range, values: [[value]])
+    }
+}
+
+/// Accessor for range operations via subscript
+public struct RangeAccessor: Sendable {
+    private let spreadsheet: Spreadsheet
+    private let range: SheetRange
+    
+    init(spreadsheet: Spreadsheet, range: SheetRange) {
+        self.spreadsheet = spreadsheet
+        self.range = range
+    }
+    
+    /// Get all values in the range
+    public func get() async throws(SheetsError) -> [[String]] {
+        try await spreadsheet.values(range: range)
+    }
+    
+    /// Set values in the range
+    public func set(_ values: [[String]]) async throws(SheetsError) {
+        try await spreadsheet.updateValues(range: range, values: values)
+    }
+    
+    /// Clear the range
+    public func clear() async throws(SheetsError) {
+        try await spreadsheet.clearValues(range: range)
     }
 }
