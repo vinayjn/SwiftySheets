@@ -115,8 +115,8 @@ try await spreadsheet.batchUpdate {
 // List Spreadsheets
 let files = try await client.drive.list(query: DriveQuery.spreadsheets.and(.notTrashed))
 
-// Create New Spreadsheet
-let newFile = try await client.drive.create(name: "New Budget", mimeType: "application/vnd.google-apps.spreadsheet")
+// Create New Spreadsheet (Defaults to spreadsheet type)
+let newFile = try await client.drive.create(name: "New Budget")
 ```
 
 ## 🧪 Testing

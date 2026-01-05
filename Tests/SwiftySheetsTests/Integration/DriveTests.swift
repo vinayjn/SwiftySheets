@@ -35,7 +35,7 @@ final class DriveTests: XCTestCase, @unchecked Sendable {
         mockSession.mockResponse = HTTPURLResponse(url: URL(string: "https://googleapis.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)
         mockSession.mockData = try JSONEncoder().encode(newFile)
         
-        let created = try await client.drive.create(name: "New Doc", mimeType: "application/pdf")
+        let created = try await client.drive.create(name: "New Doc", type: .custom("application/pdf"))
         XCTAssertEqual(created.id, "new-id")
         XCTAssertEqual(created.name, "New Doc")
     }

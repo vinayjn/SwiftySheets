@@ -38,13 +38,28 @@ public struct DriveClient: Sendable {
     
     // MARK: - Write
     
-    public func create(name: String, mimeType: String, parents: [String]? = nil) async throws(SheetsError) -> DriveFile {
+    public enum FileType: Sendable {
+        case spreadsheet
+        case folder
+        case custom(String)
+        
+        var mimeType: String {
+            switch self {
+            case .spreadsheet: return "application/vnd.google-apps.spreadsheet"
+            case .folder: return "application/vnd.google-apps.folder"
+            case .custom(let type): return type
+            }
+        }
+    }
+    
+    public func create(name: String, type: FileType = .spreadsheet, parents: [String]? = nil) async throws(SheetsError) -> DriveFile {
         let url = baseURL.appendingPathComponent("files")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let metadata = CreateFileRequest(name: name, mimeType: mimeType, parents: parents)
+        // Use type.mimeType
+        let metadata = CreateFileRequest(name: name, mimeType: type.mimeType, parents: parents)
         guard let body = try? JSONEncoder().encode(metadata) else {
             throw .invalidRequest
         }
