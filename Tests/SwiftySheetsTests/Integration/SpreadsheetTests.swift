@@ -12,8 +12,7 @@ final class SpreadsheetTests: XCTestCase, @unchecked Sendable {
         try await super.setUp()
         mockSession = MockURLSession()
         let credentials = MockCredentials()
-        let transport = SheetsTransport(credentials: credentials, session: mockSession)
-        client = Client(transport: transport)
+        client = Client(credentials: credentials, session: mockSession)
     }
     
     func testSpreadsheetWithID() async throws {
