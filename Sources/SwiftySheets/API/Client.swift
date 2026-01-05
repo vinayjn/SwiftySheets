@@ -3,7 +3,7 @@ import Foundation
 import FoundationNetworking
 #endif
 
-public protocol URLSessionProtocol: Sendable {
+protocol URLSessionProtocol: Sendable {
     func data(
         for request: URLRequest,
         delegate: (any URLSessionTaskDelegate)?
@@ -12,20 +12,21 @@ public protocol URLSessionProtocol: Sendable {
 
 extension URLSession: URLSessionProtocol {}
 
-public final class Client {
-    private let transport: Transport
+/// The main client for interacting with Google Sheets API.
+public final class Client: @unchecked Sendable {
+    private let transport: SheetsTransport
     
-    public init(transport: Transport) {
-        self.transport = transport
+    /// Access to Google Drive operations (list, create, delete spreadsheets).
+    public lazy var drive: DriveClient = DriveClient(transport: transport)
+    
+    /// Initialize with a Google credentials provider.
+    public init(credentials: GoogleCredentials) {
+        self.transport = SheetsTransport(credentials: credentials, session: URLSession.shared)
     }
     
-    public lazy var drive: DriveClient = DriveClient(transport: transport as! SheetsTransport)
-    
-    public convenience init(
-        credentials: GoogleCredentials,
-        session: URLSessionProtocol = URLSession.shared
-    ) {
-        self.init(transport: SheetsTransport(credentials: credentials, session: session))
+    /// Internal init for testing with custom session.
+    init(credentials: GoogleCredentials, session: URLSessionProtocol) {
+        self.transport = SheetsTransport(credentials: credentials, session: session)
     }
 
     func makeRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
@@ -96,10 +97,6 @@ public extension Client {
     }
     
     func createSpreadsheet(title: String) async throws -> Spreadsheet {
-        // We need a request body with just 'properties'. 
-        // Our Metadata struct has more fields but JSONEncoder might encode defaults or empty strings if we use it directly.
-        // It's cleaner to define a tailored Encodable struct for creation or map manually.
-        // Let's use a dictionary for simplicity or a private struct.
         let body: [String: Any] = ["properties": ["title": title]]
         let bodyData = try JSONSerialization.data(withJSONObject: body)
         
