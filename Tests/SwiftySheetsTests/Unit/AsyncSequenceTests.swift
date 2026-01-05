@@ -60,6 +60,26 @@ final class AsyncSequenceTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(people[1].age, "25")
     }
     
+    func testRowAsyncSequenceError() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        let mockResponse = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 403, httpVersion: nil, headerFields: nil)
+        let apiError = GoogleAPIError(error: GoogleAPIError.ErrorDetails(code: 403, message: "Permission denied", status: "PERMISSION_DENIED", details: nil))
+        mockSession.mockData = try! JSONEncoder().encode(apiError)
+        mockSession.mockResponse = mockResponse
+        
+        do {
+            for try await _ in spreadsheet.rows(in: #Range("A1:B3")) {
+                XCTFail("Should have thrown error")
+            }
+        } catch SheetsError.permissionDenied {
+            // Expected
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+    
     // MARK: - Helper
     
     private func setupMockSpreadsheet() {

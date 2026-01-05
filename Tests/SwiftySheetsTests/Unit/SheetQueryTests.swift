@@ -110,6 +110,52 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
          XCTAssertTrue(results.contains { $0.name == "Bob Smith" })
      }
     
+    func testQueryCount() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["A", "Dept", "1", "Active"],
+            ["B", "Dept", "2", "Active"],
+            ["C", "Dept", "3", "Active"]
+        ])
+        
+        let count = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .filter { $0.status == "Active" }
+            .count()
+        
+        XCTAssertEqual(count, 3)
+    }
+    
+    func testQueryFirst() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["First", "Dept", "1", "Active"],
+            ["Second", "Dept", "2", "Active"]
+        ])
+        
+        let first = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .where(\.name, equals: "First")
+            .first()
+        
+        XCTAssertNotNil(first)
+        XCTAssertEqual(first?.name, "First")
+        
+        // Re-queue response for second query
+        mockValues([
+            ["First", "Dept", "1", "Active"],
+            ["Second", "Dept", "2", "Active"]
+        ])
+        
+        let none = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .where(\.name, equals: "NonExistent")
+            .first()
+        
+        XCTAssertNil(none)
+    }
+    
     // MARK: - Helpers
     
     private func setupMockSpreadsheet() {
