@@ -3,7 +3,7 @@ import Foundation
 import FoundationNetworking
 #endif
 
-final class SheetsTransport: Transport, @unchecked Sendable {
+final class SheetsTransport: Transport, Sendable {
     private let credentials: GoogleCredentials
     private let session: URLSessionProtocol
     

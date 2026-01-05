@@ -14,14 +14,13 @@ struct UncheckedSendable<T>: @unchecked Sendable {
 ///     .sorted(by: \.name)
 ///     .fetch()
 /// ```
-public struct SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
+public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     private let spreadsheet: Spreadsheet
     private let range: SheetRange
     private let valueRenderOption: ValueRenderOption
     private let dateTimeRenderOption: DateRenderOption
     private let filterPredicate: @Sendable (T) -> Bool
-    private let sortKeyPath: UncheckedSendable<AnyKeyPath>?
-    private let sortAscending: Bool
+    private let sortComparator: (@Sendable (T, T) -> Bool)?
     private let limitCount: Int?
     
     init(
@@ -35,8 +34,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
         self.valueRenderOption = valueRenderOption
         self.dateTimeRenderOption = dateTimeRenderOption
         self.filterPredicate = { _ in true }
-        self.sortKeyPath = nil
-        self.sortAscending = true
+        self.sortComparator = nil
         self.limitCount = nil
     }
     
@@ -46,8 +44,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
         valueRenderOption: ValueRenderOption,
         dateTimeRenderOption: DateRenderOption,
         filterPredicate: @escaping @Sendable (T) -> Bool,
-        sortKeyPath: UncheckedSendable<AnyKeyPath>?,
-        sortAscending: Bool,
+        sortComparator: (@Sendable (T, T) -> Bool)?,
         limitCount: Int?
     ) {
         self.spreadsheet = spreadsheet
@@ -55,8 +52,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
         self.valueRenderOption = valueRenderOption
         self.dateTimeRenderOption = dateTimeRenderOption
         self.filterPredicate = filterPredicate
-        self.sortKeyPath = sortKeyPath
-        self.sortAscending = sortAscending
+        self.sortComparator = sortComparator
         self.limitCount = limitCount
     }
     
@@ -74,8 +70,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
             valueRenderOption: valueRenderOption,
             dateTimeRenderOption: dateTimeRenderOption,
             filterPredicate: { currentPredicate($0) && predicate($0) },
-            sortKeyPath: sortKeyPath,
-            sortAscending: sortAscending,
+            sortComparator: sortComparator,
             limitCount: limitCount
         )
     }
@@ -130,14 +125,20 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
     /// .sorted(by: \.salary, ascending: false)
     /// ```
     public func sorted<V: Comparable & Sendable>(by keyPath: KeyPath<T, V>, ascending: Bool = true) -> SheetQuery<T> {
-        SheetQuery(
+        let safeKeyPath = UncheckedSendable(keyPath)
+        let comparator: @Sendable (T, T) -> Bool = { lhs, rhs in
+            let l = lhs[keyPath: safeKeyPath.value]
+            let r = rhs[keyPath: safeKeyPath.value]
+            return ascending ? l < r : l > r
+        }
+        
+        return SheetQuery(
             spreadsheet: spreadsheet,
             range: range,
             valueRenderOption: valueRenderOption,
             dateTimeRenderOption: dateTimeRenderOption,
             filterPredicate: filterPredicate,
-            sortKeyPath: UncheckedSendable(keyPath),
-            sortAscending: ascending,
+            sortComparator: comparator,
             limitCount: limitCount
         )
     }
@@ -155,8 +156,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
             valueRenderOption: valueRenderOption,
             dateTimeRenderOption: dateTimeRenderOption,
             filterPredicate: filterPredicate,
-            sortKeyPath: sortKeyPath,
-            sortAscending: sortAscending,
+            sortComparator: sortComparator,
             limitCount: count
         )
     }
@@ -177,8 +177,8 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
         results = results.filter(filterPredicate)
         
         // Apply sort if specified
-        if let keyPathWrapper = sortKeyPath {
-            results = sortResults(results, by: keyPathWrapper.value, ascending: sortAscending)
+        if let comparator = sortComparator {
+            results.sort(by: comparator)
         }
         
         // Apply limit
@@ -197,24 +197,5 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
     /// Count rows matching the query.
     public func count() async throws(SheetsError) -> Int {
         try await fetch().count
-    }
-    
-    // Helper for type-erased sorting
-    private func sortResults(_ results: [T], by keyPath: AnyKeyPath, ascending: Bool) -> [T] {
-        // Type-erased sorting - we lose compile-time safety here but gain flexibility
-        results.sorted { lhs, rhs in
-            guard let lhsValue = lhs[keyPath: keyPath] as? any Comparable,
-                  let rhsValue = rhs[keyPath: keyPath] as? any Comparable else {
-                return false
-            }
-            return compareAny(lhsValue, rhsValue, ascending: ascending)
-        }
-    }
-    
-    private func compareAny(_ lhs: any Comparable, _ rhs: any Comparable, ascending: Bool) -> Bool {
-        // Use string representation for type-erased comparison
-        let lhsStr = String(describing: lhs)
-        let rhsStr = String(describing: rhs)
-        return ascending ? lhsStr < rhsStr : lhsStr > rhsStr
     }
 }
