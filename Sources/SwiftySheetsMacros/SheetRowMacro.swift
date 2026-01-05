@@ -69,6 +69,11 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
                             if let val = arg.expression.as(StringLiteralExprSyntax.self)?.segments.first?.as(StringSegmentSyntax.self)?.content.text {
                                 dateFormat = val
                             }
+                        } else if label == "index" {
+                            if let intExpr = arg.expression.as(IntegerLiteralExprSyntax.self),
+                               let intVal = Int(intExpr.literal.text) {
+                                columnIndex = intVal
+                            }
                         }
                     } else {
                         // Unlabeled argument -> name string

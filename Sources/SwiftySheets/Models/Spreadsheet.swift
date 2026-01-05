@@ -173,6 +173,72 @@ public extension Spreadsheet {
         )
     }
     
+    // MARK: - Streaming (AsyncSequence)
+    
+    /// Stream rows from a range as an AsyncSequence.
+    /// ```swift
+    /// for try await row in spreadsheet.rows(in: #Range("A:Z")) {
+    ///     print(row)
+    /// }
+    /// ```
+    func rows(
+        in range: SheetRange,
+        valueRenderOption: ValueRenderOption = .unformatted,
+        dateTimeRenderOption: DateRenderOption = .serialNumber
+    ) -> RowAsyncSequence {
+        RowAsyncSequence(
+            spreadsheet: self,
+            range: range,
+            valueRenderOption: valueRenderOption,
+            dateTimeRenderOption: dateTimeRenderOption
+        )
+    }
+    
+    /// Stream typed rows from a range as an AsyncSequence.
+    /// ```swift
+    /// for try await employee in spreadsheet.stream(Employee.self, in: #Range("A:D")) {
+    ///     print(employee.name)
+    /// }
+    /// ```
+    func stream<T: SheetRowDecodable & Sendable>(
+        _ type: T.Type,
+        in range: SheetRange,
+        valueRenderOption: ValueRenderOption = .unformatted,
+        dateTimeRenderOption: DateRenderOption = .serialNumber
+    ) -> TypedRowAsyncSequence<T> {
+        TypedRowAsyncSequence(
+            spreadsheet: self,
+            range: range,
+            valueRenderOption: valueRenderOption,
+            dateTimeRenderOption: dateTimeRenderOption
+        )
+    }
+    
+    // MARK: - Query DSL
+    
+    /// Create a fluent query for typed rows with filtering and sorting.
+    /// ```swift
+    /// let employees = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+    ///     .where(\.department, equals: "Engineering")
+    ///     .where(\.salary, greaterThan: 50000)
+    ///     .sorted(by: \.name)
+    ///     .limit(10)
+    ///     .fetch()
+    /// ```
+    func query<T: SheetRowDecodable & Sendable>(
+        _ type: T.Type,
+        in range: SheetRange,
+        valueRenderOption: ValueRenderOption = .unformatted,
+        dateTimeRenderOption: DateRenderOption = .serialNumber
+    ) -> SheetQuery<T> {
+        SheetQuery(
+            spreadsheet: self,
+            range: range,
+            valueRenderOption: valueRenderOption,
+            dateTimeRenderOption: dateTimeRenderOption
+        )
+    }
+    
     // MARK: - Advanced Operations
     
     func format(range: SheetRange, format: CellFormat) async throws(SheetsError) {
