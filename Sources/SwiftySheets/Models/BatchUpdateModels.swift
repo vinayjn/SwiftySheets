@@ -1,13 +1,13 @@
 /// Request models for Sheets API batch update operations.
 
-// MARK: - Write Operation Request
+// MARK: - Write Operation Request (Internal)
 
-public struct UpdateValuesRequest: Codable {
-    public let range: String
-    public let majorDimension: String
-    public let values: [[String]]
+struct UpdateValuesRequest: Codable {
+    let range: String
+    let majorDimension: String
+    let values: [[String]]
     
-    public init(range: String, values: [[String]], majorDimension: String = "ROWS") {
+    init(range: String, values: [[String]], majorDimension: String = "ROWS") {
         self.range = range
         self.values = values
         self.majorDimension = majorDimension
@@ -16,9 +16,13 @@ public struct UpdateValuesRequest: Codable {
 
 // MARK: - Batch Update
 
+/// The batch update request container. Users interact via DSL helpers like `AddSheet`, `DeleteSheet`.
 public struct BatchUpdateRequest: Encodable {
-    public let requests: [Request]
+    let requests: [Request]
     
+    /// Represents a single batch update operation.
+    /// Users should use DSL helpers (`AddSheet`, `DeleteSheet`, `FormatCells`, etc.)
+    /// rather than constructing these directly.
     public enum Request: Encodable {
         case updateCells(UpdateCellsRequest)
         case addSheet(AddSheetRequest)
@@ -55,19 +59,21 @@ public struct BatchUpdateRequest: Encodable {
         }
     }
     
-    public init(requests: [Request]) {
+    init(requests: [Request]) {
         self.requests = requests
     }
 }
 
 // MARK: - Individual Requests
+// These need to be public because they're associated values in a public enum,
+// but users should use DSL helpers instead of constructing these directly.
 
-public struct UpdateCellsRequest: Codable {
-    public let range: GridRange
-    public let rows: [RowData]
-    public let fields: String
+public struct UpdateCellsRequest: Encodable {
+    let range: GridRange
+    let rows: [RowData]
+    let fields: String
     
-    public init(sheet: Sheet, range: SheetRange, rows: [RowData], fields: String = "*") {
+    init(sheet: Sheet, range: SheetRange, rows: [RowData], fields: String = "*") {
         self.range = GridRange(sheetRange: range, sheetId: sheet.sheetId)
         self.rows = rows
         self.fields = fields
@@ -75,105 +81,105 @@ public struct UpdateCellsRequest: Codable {
 }
 
 public struct AddSheetRequest: Encodable {
-    public let properties: Sheet.Draft
+    let properties: Sheet.Draft
     
-    public init(properties: Sheet.Draft) {
+    init(properties: Sheet.Draft) {
         self.properties = properties
     }
 }
 
-public struct DeleteSheetRequest: Codable {
-    public let sheetId: Int
+public struct DeleteSheetRequest: Encodable {
+    let sheetId: Int
     
-    public init(sheetId: Int) {
+    init(sheetId: Int) {
         self.sheetId = sheetId
     }
 }
 
-public struct SortRangeRequest: Codable {
-    public let range: GridRange
-    public let sortSpecs: [SortSpec]
+public struct SortRangeRequest: Encodable {
+    let range: GridRange
+    let sortSpecs: [SortSpec]
     
-    public init(sheet: Sheet, range: SheetRange, sortSpecs: [SortSpec]) {
+    init(sheet: Sheet, range: SheetRange, sortSpecs: [SortSpec]) {
         self.range = GridRange(sheetRange: range, sheetId: sheet.sheetId)
         self.sortSpecs = sortSpecs
     }
 }
 
-public struct SortSpec: Codable {
-    public let dimensionIndex: Int
-    public let sortOrder: SortOrder
+struct SortSpec: Encodable {
+    let dimensionIndex: Int
+    let sortOrder: SortOrder
     
-    public init(dimensionIndex: Int, sortOrder: SortOrder) {
+    init(dimensionIndex: Int, sortOrder: SortOrder) {
         self.dimensionIndex = dimensionIndex
         self.sortOrder = sortOrder
     }
 }
 
-public struct RepeatCellRequest: Codable {
-    public let range: GridRange
-    public let cell: CellData
-    public let fields: String
+public struct RepeatCellRequest: Encodable {
+    let range: GridRange
+    let cell: CellData
+    let fields: String
     
-    public init(sheet: Sheet, range: SheetRange, cell: CellData, fields: String) {
+    init(sheet: Sheet, range: SheetRange, cell: CellData, fields: String) {
         self.range = GridRange(sheetRange: range, sheetId: sheet.sheetId)
         self.cell = cell
         self.fields = fields
     }
 }
 
-public struct UpdateSheetPropertiesRequest: Codable {
-    public let properties: Sheet.SheetProperties
-    public let fields: String
+public struct UpdateSheetPropertiesRequest: Encodable {
+    let properties: Sheet.SheetProperties
+    let fields: String
     
-    public init(properties: Sheet.SheetProperties, fields: String) {
+    init(properties: Sheet.SheetProperties, fields: String) {
         self.properties = properties
         self.fields = fields
     }
 }
 
-// MARK: - Cell Data
+// MARK: - Cell Data (Internal)
 
-public struct RowData: Codable {
-    public let values: [CellData]
+struct RowData: Encodable {
+    let values: [CellData]
     
-    public init(values: [CellData]) {
+    init(values: [CellData]) {
         self.values = values
     }
 }
 
-public struct CellData: Codable {
-    public let userEnteredValue: ExtendedValue?
-    public let userEnteredFormat: CellFormat?
+struct CellData: Encodable {
+    let userEnteredValue: ExtendedValue?
+    let userEnteredFormat: CellFormat?
     
-    public init(userEnteredValue: ExtendedValue? = nil, userEnteredFormat: CellFormat? = nil) {
+    init(userEnteredValue: ExtendedValue? = nil, userEnteredFormat: CellFormat? = nil) {
         self.userEnteredValue = userEnteredValue
         self.userEnteredFormat = userEnteredFormat
     }
 }
 
-public struct ExtendedValue: Codable {
-    public let stringValue: String?
-    public let numberValue: Double?
-    public let boolValue: Bool?
+struct ExtendedValue: Encodable {
+    let stringValue: String?
+    let numberValue: Double?
+    let boolValue: Bool?
     
-    public init(stringValue: String? = nil, numberValue: Double? = nil, boolValue: Bool? = nil) {
+    init(stringValue: String? = nil, numberValue: Double? = nil, boolValue: Bool? = nil) {
         self.stringValue = stringValue
         self.numberValue = numberValue
         self.boolValue = boolValue
     }
 }
 
-// MARK: - Grid Range
+// MARK: - Grid Range (Internal)
 
-public struct GridRange: Codable {
-    public let sheetId: Int?
-    public let startRowIndex: Int?
-    public let endRowIndex: Int?
-    public let startColumnIndex: Int?
-    public let endColumnIndex: Int?
+struct GridRange: Encodable {
+    let sheetId: Int?
+    let startRowIndex: Int?
+    let endRowIndex: Int?
+    let startColumnIndex: Int?
+    let endColumnIndex: Int?
     
-    public init(sheetId: Int? = nil, startRowIndex: Int? = nil, endRowIndex: Int? = nil, startColumnIndex: Int? = nil, endColumnIndex: Int? = nil) {
+    init(sheetId: Int? = nil, startRowIndex: Int? = nil, endRowIndex: Int? = nil, startColumnIndex: Int? = nil, endColumnIndex: Int? = nil) {
         self.sheetId = sheetId
         self.startRowIndex = startRowIndex
         self.endRowIndex = endRowIndex
@@ -181,11 +187,11 @@ public struct GridRange: Codable {
         self.endColumnIndex = endColumnIndex
     }
     
-    internal init(range: String, sheetId: Int) {
-        self.init(sheetRange: SheetRange(parsing: range), sheetId: sheetId)
+    init(range: String, sheetId: Int) throws {
+        try self.init(sheetRange: SheetRange(parsing: range), sheetId: sheetId)
     }
     
-    public init(sheetRange: SheetRange, sheetId: Int) {
+    init(sheetRange: SheetRange, sheetId: Int) {
         let startRowIndex = sheetRange.startRow.map { $0.value - 1 }
         
         var endRowIndex: Int? = sheetRange.endRow?.value
