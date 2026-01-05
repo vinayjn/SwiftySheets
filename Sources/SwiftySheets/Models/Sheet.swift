@@ -34,7 +34,7 @@ public struct Sheet: Codable, Sendable {
         }
     }
     
-    public struct Draft: Encodable {
+    public struct Draft: Encodable, Sendable {
         public let title: String
         public let gridProperties: GridProperties?
         

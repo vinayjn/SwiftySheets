@@ -17,11 +17,13 @@ public struct GoogleAPIError: Codable, Sendable {
     }
 }
 
-public enum SheetsError: Error {
+/// Errors thrown by SwiftySheets API operations.
+/// All throwing functions use typed throws: `throws(SheetsError)`
+public enum SheetsError: Error, Sendable {
     case invalidResponse(status: Int)
     case authenticationFailed
     case invalidRequest
-    case networkError(Error)
+    case networkError(String)  // Changed from Error to String for Sendable
     case invalidCredentials(message: String)
     case spreadsheetNotFound(message: String)
     case sheetNotFound(message: String)

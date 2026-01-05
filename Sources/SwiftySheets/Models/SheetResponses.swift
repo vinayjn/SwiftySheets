@@ -1,6 +1,6 @@
 /// Response models for Sheets API operations.
 
-struct ValueRange: Codable {
+struct ValueRange: Codable, Sendable {
     let range: String
     let values: [[String]]
     
@@ -34,7 +34,7 @@ struct ValueRange: Codable {
 }
 
 // Helper to decode String, Int, Double, Bool into a String
-private struct SafeString: Decodable {
+private struct SafeString: Decodable, Sendable {
     let value: String
     
     init(from decoder: Decoder) throws {
@@ -53,7 +53,7 @@ private struct SafeString: Decodable {
     }
 }
 
-public struct UpdateValuesResponse: Codable {
+public struct UpdateValuesResponse: Codable, Sendable {
     public let spreadsheetId: String
     public let updatedRange: String
     public let updatedRows: Int
@@ -61,22 +61,22 @@ public struct UpdateValuesResponse: Codable {
     public let updatedCells: Int
 }
 
-public struct AppendValuesResponse: Codable {
+public struct AppendValuesResponse: Codable, Sendable {
     public let spreadsheetId: String
     public let tableRange: String?
     public let updates: UpdateValuesResponse
 }
 
-public struct ClearValuesResponse: Codable {
+public struct ClearValuesResponse: Codable, Sendable {
     public let spreadsheetId: String
     public let clearedRange: String
 }
 
-public struct BatchUpdateResponse: Codable {
+public struct BatchUpdateResponse: Codable, Sendable {
     public let spreadsheetId: String
     public let replies: [Reply]?
     
-    public struct Reply: Codable {
+    public struct Reply: Codable, Sendable {
         public let addSheet: AddSheetResponse?
         
         public init(addSheet: AddSheetResponse? = nil) {
@@ -90,7 +90,7 @@ public struct BatchUpdateResponse: Codable {
     }
 }
 
-public struct AddSheetResponse: Codable {
+public struct AddSheetResponse: Codable, Sendable {
     public let properties: Sheet.SheetProperties
     
     public init(properties: Sheet.SheetProperties) {

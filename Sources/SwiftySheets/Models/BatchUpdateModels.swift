@@ -2,7 +2,7 @@
 
 // MARK: - Write Operation Request (Internal)
 
-struct UpdateValuesRequest: Codable {
+struct UpdateValuesRequest: Codable, Sendable {
     let range: String
     let majorDimension: String
     let values: [[String]]
@@ -17,13 +17,13 @@ struct UpdateValuesRequest: Codable {
 // MARK: - Batch Update
 
 /// The batch update request container. Users interact via DSL helpers like `AddSheet`, `DeleteSheet`.
-public struct BatchUpdateRequest: Encodable {
+public struct BatchUpdateRequest: Encodable, Sendable {
     let requests: [Request]
     
     /// Represents a single batch update operation.
     /// Users should use DSL helpers (`AddSheet`, `DeleteSheet`, `FormatCells`, etc.)
     /// rather than constructing these directly.
-    public enum Request: Encodable {
+    public enum Request: Encodable, Sendable {
         case updateCells(UpdateCellsRequest)
         case addSheet(AddSheetRequest)
         case deleteSheet(DeleteSheetRequest)
@@ -68,7 +68,7 @@ public struct BatchUpdateRequest: Encodable {
 // These need to be public because they're associated values in a public enum,
 // but users should use DSL helpers instead of constructing these directly.
 
-public struct UpdateCellsRequest: Encodable {
+public struct UpdateCellsRequest: Encodable, Sendable {
     let range: GridRange
     let rows: [RowData]
     let fields: String
@@ -80,7 +80,7 @@ public struct UpdateCellsRequest: Encodable {
     }
 }
 
-public struct AddSheetRequest: Encodable {
+public struct AddSheetRequest: Encodable, Sendable {
     let properties: Sheet.Draft
     
     init(properties: Sheet.Draft) {
@@ -88,7 +88,7 @@ public struct AddSheetRequest: Encodable {
     }
 }
 
-public struct DeleteSheetRequest: Encodable {
+public struct DeleteSheetRequest: Encodable, Sendable {
     let sheetId: Int
     
     init(sheetId: Int) {
@@ -96,7 +96,7 @@ public struct DeleteSheetRequest: Encodable {
     }
 }
 
-public struct SortRangeRequest: Encodable {
+public struct SortRangeRequest: Encodable, Sendable {
     let range: GridRange
     let sortSpecs: [SortSpec]
     
@@ -106,7 +106,7 @@ public struct SortRangeRequest: Encodable {
     }
 }
 
-struct SortSpec: Encodable {
+struct SortSpec: Encodable, Sendable {
     let dimensionIndex: Int
     let sortOrder: SortOrder
     
@@ -116,7 +116,7 @@ struct SortSpec: Encodable {
     }
 }
 
-public struct RepeatCellRequest: Encodable {
+public struct RepeatCellRequest: Encodable, Sendable {
     let range: GridRange
     let cell: CellData
     let fields: String
@@ -128,7 +128,7 @@ public struct RepeatCellRequest: Encodable {
     }
 }
 
-public struct UpdateSheetPropertiesRequest: Encodable {
+public struct UpdateSheetPropertiesRequest: Encodable, Sendable {
     let properties: Sheet.SheetProperties
     let fields: String
     
@@ -140,7 +140,7 @@ public struct UpdateSheetPropertiesRequest: Encodable {
 
 // MARK: - Cell Data (Internal)
 
-struct RowData: Encodable {
+struct RowData: Encodable, Sendable {
     let values: [CellData]
     
     init(values: [CellData]) {
@@ -148,7 +148,7 @@ struct RowData: Encodable {
     }
 }
 
-struct CellData: Encodable {
+struct CellData: Encodable, Sendable {
     let userEnteredValue: ExtendedValue?
     let userEnteredFormat: CellFormat?
     
@@ -158,7 +158,7 @@ struct CellData: Encodable {
     }
 }
 
-struct ExtendedValue: Encodable {
+struct ExtendedValue: Encodable, Sendable {
     let stringValue: String?
     let numberValue: Double?
     let boolValue: Bool?
@@ -172,7 +172,7 @@ struct ExtendedValue: Encodable {
 
 // MARK: - Grid Range (Internal)
 
-struct GridRange: Encodable {
+struct GridRange: Encodable, Sendable {
     let sheetId: Int?
     let startRowIndex: Int?
     let endRowIndex: Int?
