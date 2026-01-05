@@ -3,7 +3,7 @@ import Foundation
 import FoundationNetworking
 #endif
 
-public enum Endpoint {
+enum Endpoint {
     private static let baseURL = "https://sheets.googleapis.com/v4/spreadsheets"
 
     case spreadsheet(id: String)

@@ -3,6 +3,6 @@ import Foundation
 import FoundationNetworking
 #endif
 
-public protocol Transport: Sendable {
+protocol Transport: Sendable {
     func send(_ request: URLRequest) async throws -> (Data, URLResponse)
 }
