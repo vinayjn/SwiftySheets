@@ -247,20 +247,7 @@ public extension Spreadsheet {
         try await batchUpdate(requests: [request.request])
     }
     
-    /// Format cells using a declarative builder syntax:
-    /// ```
-    /// try await spreadsheet.format(#Range("A1:B10")) {
-    ///     BackgroundColor(.blue)
-    ///     Bold()
-    ///     FontSize(14)
-    /// }
-    /// ```
-    func format(
-        _ range: SheetRange,
-        @CellFormatBuilder _ builder: () -> CellFormat
-    ) async throws(SheetsError) {
-        try await format(range: range, format: builder())
-    }
+
     
     func sort(range: SheetRange, column: Int, ascending: Bool = true) async throws(SheetsError) {
         let sheet = try resolveSheet(for: range)

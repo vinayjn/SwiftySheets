@@ -88,17 +88,16 @@ for try await user in spreadsheet.stream(User.self, in: #Range("A:Z")) {
 ```
 
 ### 🎨 Cell Formatting
-Apply styles with a SwiftUI-like declarative syntax.
+Apply styles with a clean fluent API.
 ```swift
-try await spreadsheet.format(range: #Range("A1:D1")) {
-    BackgroundColor(.blue)
-    TextFormat(
-        bold: true,
-        foregroundColor: .white,
-        fontSize: 12
-    )
-    HorizontalAlignment(.center)
-}
+try await spreadsheet.format(
+    range: #Range("A1:D1"),
+    format: .backgroundColor(.blue)
+            .bold()
+            .foregroundColor(.white)
+            .fontSize(12)
+            .alignment(.center)
+)
 ```
 
 ### 🛠️ Batch Operations
