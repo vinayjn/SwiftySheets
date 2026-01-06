@@ -1,18 +1,5 @@
 import Foundation
 
-/// MIME types for Drive file filtering.
-public enum DriveMimeType: String, Sendable {
-    case spreadsheet = "application/vnd.google-apps.spreadsheet"
-    case folder = "application/vnd.google-apps.folder"
-    case document = "application/vnd.google-apps.document"
-    case presentation = "application/vnd.google-apps.presentation"
-    case drawing = "application/vnd.google-apps.drawing"
-    case form = "application/vnd.google-apps.form"
-    case script = "application/vnd.google-apps.script"
-    case site = "application/vnd.google-apps.site"
-    case pdf = "application/pdf"
-}
-
 /// A fluent builder for listing Drive files with chainable filters.
 /// Uses Set-based storage to prevent duplicate filters (idempotent operations).
 /// ```swift
@@ -37,25 +24,14 @@ public final class DriveListBuilder: @unchecked Sendable {
     /// Filter to only spreadsheets.
     @discardableResult
     public func spreadsheets() -> DriveListBuilder {
-        mimeType(.spreadsheet)
+        queryParts.insert("mimeType = 'application/vnd.google-apps.spreadsheet'")
+        return self
     }
     
     /// Filter to only folders.
     @discardableResult
     public func folders() -> DriveListBuilder {
-        mimeType(.folder)
-    }
-    
-    /// Filter to only documents.
-    @discardableResult
-    public func documents() -> DriveListBuilder {
-        mimeType(.document)
-    }
-    
-    /// Filter by MIME type enum.
-    @discardableResult
-    public func mimeType(_ type: DriveMimeType) -> DriveListBuilder {
-        queryParts.insert("mimeType = '\(type.rawValue)'")
+        queryParts.insert("mimeType = 'application/vnd.google-apps.folder'")
         return self
     }
     
@@ -120,15 +96,6 @@ public final class DriveListBuilder: @unchecked Sendable {
     @discardableResult
     public func inFolder(_ folderId: String) -> DriveListBuilder {
         queryParts.insert("'\(folderId)' in parents")
-        return self
-    }
-    
-    // MARK: - Custom Query
-    
-    /// Add a custom query part (for advanced use).
-    @discardableResult
-    public func custom(_ queryPart: String) -> DriveListBuilder {
-        queryParts.insert(queryPart)
         return self
     }
     
