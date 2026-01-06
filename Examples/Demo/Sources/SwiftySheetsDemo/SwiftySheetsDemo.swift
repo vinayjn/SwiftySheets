@@ -337,13 +337,14 @@ struct DemoApp {
         guard let addr = readLine(), !addr.isEmpty else { return }
         
         // Read
-        let current = try await s[addr].get()
+        let range = try SheetRange(parsing: addr)
+        let current = try await s[range].stringValue()
         print("Current Value: \(current ?? "nil")".blue)
         
         print("Enter New Value (or Enter to skip): ", terminator: "")
         let input = readLine() ?? ""
         if !input.isEmpty {
-            try await s[addr].set(input)
+            try await s[range].set(input)
             print("✅ Updated.".green)
         }
     }

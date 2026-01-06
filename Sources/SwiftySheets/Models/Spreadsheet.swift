@@ -284,47 +284,10 @@ public extension Spreadsheet {
 /// For type-safe operations, use the explicit method APIs.
 public extension Spreadsheet {
     
-    /// Access a single cell value using A1 notation: `spreadsheet["A1"]`
-    subscript(_ a1Notation: String) -> CellAccessor {
-        CellAccessor(spreadsheet: self, notation: a1Notation)
-    }
-    
-    /// Access a single cell by row and column (1-indexed): `spreadsheet[1, 1]`
-    subscript(_ row: Int, _ column: Int) -> CellAccessor {
-        let colStr = SheetRange.indexToColumn(column - 1)
-        return CellAccessor(spreadsheet: self, notation: "\(colStr)\(row)")
-    }
-    
     /// Access cells with a validated SheetRange: `spreadsheet[#Range("A1:B10")]`
+    /// Or use the new Column DSL: `spreadsheet[Column.A[1]...Column.B[10]]`
     subscript(_ range: SheetRange) -> RangeAccessor {
         RangeAccessor(spreadsheet: self, range: range)
-    }
-}
-
-/// Accessor for single cell operations via subscript
-public struct CellAccessor: Sendable {
-    private let spreadsheet: Spreadsheet
-    private let notation: String
-    
-    init(spreadsheet: Spreadsheet, notation: String) {
-        self.spreadsheet = spreadsheet
-        self.notation = notation
-    }
-    
-    /// Get the cell value
-    public func get() async throws(SheetsError) -> String? {
-        guard let range = try? SheetRange(parsing: notation) else {
-            throw .invalidRange(message: "Invalid A1 notation: \(notation)")
-        }
-        return try await spreadsheet.cell(range)
-    }
-    
-    /// Set the cell value
-    public func set(_ value: String) async throws(SheetsError) {
-        guard let range = try? SheetRange(parsing: notation) else {
-            throw .invalidRange(message: "Invalid A1 notation: \(notation)")
-        }
-        try await spreadsheet.updateValues(range: range, values: [[value]])
     }
 }
 
@@ -351,5 +314,17 @@ public struct RangeAccessor: Sendable {
     /// Clear the range
     public func clear() async throws(SheetsError) {
         try await spreadsheet.clearValues(range: range)
+    }
+    
+    // MARK: - Single Value Helpers
+    
+    /// Get the first cell value in the range
+    public func stringValue() async throws(SheetsError) -> String? {
+        try await spreadsheet.cell(range)
+    }
+    
+    /// Set a single value (top-left cell of range)
+    public func set(_ value: String) async throws(SheetsError) {
+        try await spreadsheet.updateValues(range: range, values: [[value]])
     }
 }

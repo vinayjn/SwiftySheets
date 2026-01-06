@@ -15,7 +15,7 @@ final class SubscriptTests: XCTestCase, @unchecked Sendable {
         client = Client(credentials: credentials, session: mockSession)
     }
     
-    // MARK: - CellAccessor Tests
+    // MARK: - RangeAccessor (Single Value) Tests
     
     func testCellAccessorGet() async throws {
         // Setup mock spreadsheet metadata
@@ -30,8 +30,8 @@ final class SubscriptTests: XCTestCase, @unchecked Sendable {
         mockSession.mockResponse = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)
         
         // Test subscript access
-        let accessor = spreadsheet["A1"]
-        let value = try await accessor.get()
+        let accessor = spreadsheet[try SheetRange(parsing: "A1")]
+        let value = try await accessor.stringValue()
         
         XCTAssertEqual(value, "Hello")
     }
@@ -48,7 +48,7 @@ final class SubscriptTests: XCTestCase, @unchecked Sendable {
         mockSession.mockResponse = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)
         
         // Test subscript set
-        let accessor = spreadsheet["A1"]
+        let accessor = spreadsheet[try SheetRange(parsing: "A1")]
         try await accessor.set("World")
         // If no error thrown, test passes
     }
@@ -57,8 +57,8 @@ final class SubscriptTests: XCTestCase, @unchecked Sendable {
         setupMockSpreadsheet()
         let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
         
-        // Create accessor using row/column
-        let accessor = spreadsheet[1, 1] // A1
+        // Create accessor using Column DSL
+        let accessor = spreadsheet[Column.A[1]] // A1
         
         // Setup mock response
         let valuesResponse = """
@@ -67,7 +67,7 @@ final class SubscriptTests: XCTestCase, @unchecked Sendable {
         mockSession.mockData = valuesResponse.data(using: .utf8)
         mockSession.mockResponse = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)
         
-        let value = try await accessor.get()
+        let value = try await accessor.stringValue()
         XCTAssertEqual(value, "Cell Value")
     }
     
@@ -76,7 +76,7 @@ final class SubscriptTests: XCTestCase, @unchecked Sendable {
         let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
         
         // Column 26 = Z
-        let accessor = spreadsheet[1, 26]
+        let accessor = spreadsheet[Column.Z[1]]
         
         let valuesResponse = """
         {"range": "Z1", "values": [["Z Column"]]}
@@ -84,7 +84,7 @@ final class SubscriptTests: XCTestCase, @unchecked Sendable {
         mockSession.mockData = valuesResponse.data(using: .utf8)
         mockSession.mockResponse = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)
         
-        let value = try await accessor.get()
+        let value = try await accessor.stringValue()
         XCTAssertEqual(value, "Z Column")
     }
     
