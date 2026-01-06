@@ -1,6 +1,20 @@
 import Foundation
 
+/// MIME types for Drive file filtering.
+public enum DriveMimeType: String, Sendable {
+    case spreadsheet = "application/vnd.google-apps.spreadsheet"
+    case folder = "application/vnd.google-apps.folder"
+    case document = "application/vnd.google-apps.document"
+    case presentation = "application/vnd.google-apps.presentation"
+    case drawing = "application/vnd.google-apps.drawing"
+    case form = "application/vnd.google-apps.form"
+    case script = "application/vnd.google-apps.script"
+    case site = "application/vnd.google-apps.site"
+    case pdf = "application/pdf"
+}
+
 /// A fluent builder for listing Drive files with chainable filters.
+/// Uses Set-based storage to prevent duplicate filters (idempotent operations).
 /// ```swift
 /// let reports = try await client.drive.list()
 ///     .spreadsheets()
@@ -11,8 +25,8 @@ import Foundation
 public final class DriveListBuilder: @unchecked Sendable {
     private let driveClient: DriveClient
     
-    // Mutable state - accumulated filters
-    private var queryParts: [String] = []
+    // Use Set to prevent duplicate filters
+    private var queryParts: Set<String> = []
     
     init(driveClient: DriveClient) {
         self.driveClient = driveClient
@@ -23,21 +37,25 @@ public final class DriveListBuilder: @unchecked Sendable {
     /// Filter to only spreadsheets.
     @discardableResult
     public func spreadsheets() -> DriveListBuilder {
-        queryParts.append("mimeType = 'application/vnd.google-apps.spreadsheet'")
-        return self
+        mimeType(.spreadsheet)
     }
     
     /// Filter to only folders.
     @discardableResult
     public func folders() -> DriveListBuilder {
-        queryParts.append("mimeType = 'application/vnd.google-apps.folder'")
-        return self
+        mimeType(.folder)
     }
     
-    /// Filter by specific MIME type.
+    /// Filter to only documents.
     @discardableResult
-    public func mimeType(_ type: String) -> DriveListBuilder {
-        queryParts.append("mimeType = '\(type)'")
+    public func documents() -> DriveListBuilder {
+        mimeType(.document)
+    }
+    
+    /// Filter by MIME type enum.
+    @discardableResult
+    public func mimeType(_ type: DriveMimeType) -> DriveListBuilder {
+        queryParts.insert("mimeType = '\(type.rawValue)'")
         return self
     }
     
@@ -47,7 +65,7 @@ public final class DriveListBuilder: @unchecked Sendable {
     @discardableResult
     public func nameContains(_ substring: String) -> DriveListBuilder {
         let escaped = substring.replacingOccurrences(of: "'", with: "\\'")
-        queryParts.append("name contains '\(escaped)'")
+        queryParts.insert("name contains '\(escaped)'")
         return self
     }
     
@@ -55,7 +73,7 @@ public final class DriveListBuilder: @unchecked Sendable {
     @discardableResult
     public func nameEquals(_ name: String) -> DriveListBuilder {
         let escaped = name.replacingOccurrences(of: "'", with: "\\'")
-        queryParts.append("name = '\(escaped)'")
+        queryParts.insert("name = '\(escaped)'")
         return self
     }
     
@@ -64,35 +82,35 @@ public final class DriveListBuilder: @unchecked Sendable {
     /// Exclude trashed files.
     @discardableResult
     public func notTrashed() -> DriveListBuilder {
-        queryParts.append("trashed = false")
+        queryParts.insert("trashed = false")
         return self
     }
     
     /// Include only trashed files.
     @discardableResult
     public func trashed() -> DriveListBuilder {
-        queryParts.append("trashed = true")
+        queryParts.insert("trashed = true")
         return self
     }
     
     /// Filter files owned by the authenticated user.
     @discardableResult
     public func ownedByMe() -> DriveListBuilder {
-        queryParts.append("'me' in owners")
+        queryParts.insert("'me' in owners")
         return self
     }
     
     /// Filter files shared with the authenticated user.
     @discardableResult
     public func sharedWithMe() -> DriveListBuilder {
-        queryParts.append("sharedWithMe = true")
+        queryParts.insert("sharedWithMe = true")
         return self
     }
     
     /// Filter files starred by the authenticated user.
     @discardableResult
     public func starred() -> DriveListBuilder {
-        queryParts.append("starred = true")
+        queryParts.insert("starred = true")
         return self
     }
     
@@ -101,7 +119,7 @@ public final class DriveListBuilder: @unchecked Sendable {
     /// Filter files in a specific folder.
     @discardableResult
     public func inFolder(_ folderId: String) -> DriveListBuilder {
-        queryParts.append("'\(folderId)' in parents")
+        queryParts.insert("'\(folderId)' in parents")
         return self
     }
     
@@ -110,7 +128,7 @@ public final class DriveListBuilder: @unchecked Sendable {
     /// Add a custom query part (for advanced use).
     @discardableResult
     public func custom(_ queryPart: String) -> DriveListBuilder {
-        queryParts.append(queryPart)
+        queryParts.insert(queryPart)
         return self
     }
     
@@ -119,7 +137,8 @@ public final class DriveListBuilder: @unchecked Sendable {
     /// Build the query string from accumulated parts.
     private func buildQuery() -> String? {
         guard !queryParts.isEmpty else { return nil }
-        return queryParts.joined(separator: " and ")
+        // Sort for deterministic output
+        return queryParts.sorted().joined(separator: " and ")
     }
     
     /// Execute the query and return matching files.
