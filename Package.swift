@@ -13,10 +13,6 @@ let package = Package(
             name: "SwiftySheets",
             targets: ["SwiftySheets"]
         ),
-        .executable(
-            name: "SwiftySheetsDemo",
-            targets: ["SwiftySheetsDemo"]
-        )
     ],
     dependencies: [
         .package(url: "https://github.com/googleapis/google-auth-library-swift.git", from: "0.5.0"),
@@ -46,11 +42,6 @@ let package = Package(
                 "SwiftySheets",
                 .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
             ]
-        ),
-        // Demo
-        .executableTarget(
-            name: "SwiftySheetsDemo",
-            dependencies: ["SwiftySheets"]
         ),
     ]
 )
