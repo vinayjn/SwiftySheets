@@ -98,16 +98,15 @@ let topUser = try await spreadsheet.query(User.self, in: #Range("A:D"))
 ```
 
 ### 🎨 Cell Formatting
-Apply styles with a clean fluent API.
+Apply styles with a fluent builder.
 ```swift
-try await spreadsheet.format(
-    range: #Range("A1:D1"),
-    format: .backgroundColor(.blue)
-            .bold()
-            .foregroundColor(.white)
-            .fontSize(12)
-            .alignment(.center)
-)
+try await spreadsheet.format(#Range("A1:D1"))
+    .backgroundColor(.blue)
+    .bold()
+    .foregroundColor(.white)
+    .fontSize(12)
+    .alignment(.center)
+    .apply()
 ```
 
 ### 🛠️ Batch Operations

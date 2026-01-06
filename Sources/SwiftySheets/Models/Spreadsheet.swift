@@ -207,6 +207,17 @@ public extension Spreadsheet {
         try await batchUpdate(requests: [request.request])
     }
     
+    /// Create a fluent format builder for the specified range.
+    /// ```swift
+    /// try await spreadsheet.format(#Range("A1:D1"))
+    ///     .backgroundColor(.blue)
+    ///     .bold()
+    ///     .apply()
+    /// ```
+    func format(_ range: SheetRange) -> FormatBuilder {
+        FormatBuilder(spreadsheet: self, range: range)
+    }
+    
 
     
     func sort(range: SheetRange, column: Int, ascending: Bool = true) async throws(SheetsError) {
