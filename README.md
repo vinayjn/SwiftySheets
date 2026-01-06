@@ -120,10 +120,14 @@ try await spreadsheet.batchUpdate {
 
 ### 🚕 Drive Management
 ```swift
-// List Spreadsheets
-let files = try await client.drive.list(query: DriveQuery.spreadsheets.and(.notTrashed))
+// List with fluent query builder
+let reports = try await client.drive.list()
+    .spreadsheets()
+    .notTrashed()
+    .nameContains("Report")
+    .execute()
 
-// Create New Spreadsheet (Defaults to spreadsheet type)
+// Create new spreadsheet
 let newFile = try await client.drive.create(name: "New Budget")
 ```
 

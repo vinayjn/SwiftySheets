@@ -36,6 +36,18 @@ public struct DriveClient: Sendable {
         return try await list(query: query.query)
     }
     
+    /// Create a fluent query builder for listing Drive files.
+    /// ```swift
+    /// let reports = try await client.drive.list()
+    ///     .spreadsheets()
+    ///     .notTrashed()
+    ///     .nameContains("Report")
+    ///     .execute()
+    /// ```
+    public func list() -> DriveListBuilder {
+        DriveListBuilder(driveClient: self)
+    }
+    
     // MARK: - Write
     
     public enum FileType: Sendable {
