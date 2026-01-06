@@ -24,14 +24,14 @@ public final class DriveListBuilder: @unchecked Sendable {
     /// Filter to only spreadsheets.
     @discardableResult
     public func spreadsheets() -> DriveListBuilder {
-        queryParts.insert("mimeType = 'application/vnd.google-apps.spreadsheet'")
+        queryParts.insert("mimeType = '\(DriveClient.FileType.spreadsheet.mimeType)'")
         return self
     }
     
     /// Filter to only folders.
     @discardableResult
     public func folders() -> DriveListBuilder {
-        queryParts.insert("mimeType = 'application/vnd.google-apps.folder'")
+        queryParts.insert("mimeType = '\(DriveClient.FileType.folder.mimeType)'")
         return self
     }
     
