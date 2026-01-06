@@ -437,7 +437,7 @@ struct DemoApp {
                 .sorted(by: \.score, ascending: false)  // Sort by score descending
                 .offset(offset)
                 .limit(pageSize)
-                .fetch()
+                .execute()
             
             print("\n   📖 Page \(page) (offset: \(offset), limit: \(pageSize)):")
             for (i, user) in pageUsers.enumerated() {
@@ -452,7 +452,7 @@ struct DemoApp {
             .where(\.score, greaterThan: 50)
             .sorted(by: \.score, ascending: false)
             .limit(5)
-            .fetch()
+            .execute()
         
         for user in filtered {
             print("      ✅ \(user.name) - Score: \(user.score)")

@@ -355,10 +355,8 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         return results
     }
     
-    /// Alias for execute() - fetch all rows matching the query.
-    public func fetch() async throws(SheetsError) -> [T] {
-        try await execute()
-    }
+
+
     
     /// Fetch the first row matching the query.
     public func first() async throws(SheetsError) -> T? {

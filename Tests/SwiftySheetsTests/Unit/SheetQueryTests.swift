@@ -26,7 +26,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .where(\.department, equals: "Engineering")
             .where(\.status, equals: "Active")
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
         XCTAssertEqual(results[0].name, "Alice")
@@ -45,7 +45,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .where(\.salaryInt, greaterThan: 50000)
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
         XCTAssertTrue(results.contains { $0.name == "Mid" })
@@ -64,7 +64,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .sorted(by: \.name)
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 3)
         XCTAssertEqual(results[0].name, "Alice")
@@ -84,7 +84,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .limit(2)
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
         XCTAssertEqual(results[0].name, "A")
@@ -103,7 +103,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
          
          let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
              .where(\.name, contains: "Smith")
-             .fetch()
+             .execute()
          
          XCTAssertEqual(results.count, 2)
          XCTAssertTrue(results.contains { $0.name == "John Smith" })
@@ -190,7 +190,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .where(\.status, notEquals: "Deleted")
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
         XCTAssertFalse(results.contains { $0.name == "Bob" })
@@ -208,7 +208,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .where(\.salaryInt, greaterThanOrEquals: 50000)
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
         XCTAssertTrue(results.contains { $0.name == "B" })
@@ -227,7 +227,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .where(\.salaryInt, lessThanOrEquals: 50000)
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
         XCTAssertTrue(results.contains { $0.name == "A" })
@@ -247,7 +247,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .where(\.salaryInt, between: 50000...75000)
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
         XCTAssertTrue(results.contains { $0.name == "B" })
@@ -266,7 +266,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .where(\.name, startsWith: "admin")
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
     }
@@ -283,7 +283,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .where(\.name, endsWith: "@company.com")
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
     }
@@ -302,7 +302,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .sorted(by: \.department)
             .thenSorted(by: \.name)
-            .fetch()
+            .execute()
         
         // Engineering comes first (alphabetically), then Marketing
         // Within Engineering: Alice, Charlie, David (alphabetically)
@@ -327,7 +327,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .offset(2)
             .limit(2)
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
         XCTAssertEqual(results[0].name, "C")
@@ -353,7 +353,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
             .where(\.salaryInt, between: 60000...85000)
             .sorted(by: \.salaryInt, ascending: false)
             .limit(2)
-            .fetch()
+            .execute()
         
         XCTAssertEqual(results.count, 2)
         XCTAssertEqual(results[0].name, "Alice")  // 80k

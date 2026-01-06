@@ -125,11 +125,6 @@ public final class DriveListBuilder: @unchecked Sendable {
         try await driveClient.list(query: buildQuery())
     }
     
-    /// Alias for execute().
-    public func fetch() async throws(SheetsError) -> [DriveFile] {
-        try await execute()
-    }
-    
     /// Return the first matching file.
     public func first() async throws(SheetsError) -> DriveFile? {
         try await execute().first

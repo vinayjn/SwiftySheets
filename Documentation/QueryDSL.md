@@ -104,13 +104,12 @@ let page3 = try await spreadsheet.query(User.self, in: #Range("A:D"))
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `execute()` | `[T]` | Execute query and return all matching rows |
-| `fetch()` | `[T]` | Alias for `execute()` |
 | `first()` | `T?` | Return first matching row or nil |
 | `count()` | `Int` | Return count of matching rows |
 
 ## Execution Order
 
-When you call `fetch()`, operations are applied in this order:
+When you call `execute()`, operations are applied in this order:
 
 1. **Filter** - All `.where()` and `.filter()` predicates (AND'd together, with `.or()` branches)
 2. **Sort** - Primary sort, then secondary sorts
