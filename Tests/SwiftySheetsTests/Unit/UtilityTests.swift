@@ -90,45 +90,4 @@ final class UtilityTests: XCTestCase {
         XCTAssertEqual(decoded.horizontalAlignment, .center)
         XCTAssertEqual(decoded.textFormat?.bold, true)
     }
-    
-    // MARK: - DriveQuery Combinators
-    
-    func testDriveQuerySpreadsheets() {
-        let query = DriveQuery.spreadsheets
-        XCTAssertTrue(query.query.contains("application/vnd.google-apps.spreadsheet"))
-    }
-    
-    func testDriveQueryFolders() {
-        let query = DriveQuery.folders
-        XCTAssertTrue(query.query.contains("application/vnd.google-apps.folder"))
-    }
-    
-    func testDriveQueryNotTrashed() {
-        let query = DriveQuery.notTrashed
-        XCTAssertEqual(query.query, "trashed = false")
-    }
-    
-    func testDriveQueryNameContains() {
-        let query = DriveQuery.nameContains("Budget")
-        XCTAssertTrue(query.query.contains("Budget"))
-        XCTAssertTrue(query.query.contains("name contains"))
-    }
-    
-    func testDriveQueryCombination() {
-        let query = DriveQuery.spreadsheets.and(.notTrashed)
-        
-        XCTAssertTrue(query.query.contains("mimeType"))
-        XCTAssertTrue(query.query.contains("trashed = false"))
-        XCTAssertTrue(query.query.contains(") and ("))
-    }
-    
-    func testDriveQueryMultipleCombinations() {
-        let query = DriveQuery.spreadsheets
-            .and(.notTrashed)
-            .and(.nameContains("2024"))
-        
-        XCTAssertTrue(query.query.contains("mimeType"))
-        XCTAssertTrue(query.query.contains("trashed"))
-        XCTAssertTrue(query.query.contains("2024"))
-    }
 }

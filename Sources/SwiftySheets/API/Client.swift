@@ -138,7 +138,7 @@ public extension Client {
     }
     
     func listSpreadsheets() async throws(SheetsError) -> [DriveFile] {
-        return try await drive.list(query: DriveQuery.spreadsheets.and(.notTrashed).query)
+        return try await drive.list().spreadsheets().notTrashed().execute()
     }
     
     func updateValues(

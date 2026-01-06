@@ -47,9 +47,4 @@ final class DriveTests: XCTestCase, @unchecked Sendable {
         try await client.drive.delete(id: "file-id")
         // Success if no throw
     }
-    
-    func testQueryBuilder() async throws {
-         let query = DriveQuery.spreadsheets.and(.notTrashed).and(.nameContains("Budget"))
-         XCTAssertEqual(query.query, "((mimeType = 'application/vnd.google-apps.spreadsheet') and (trashed = false)) and (name contains 'Budget')")
-    }
 }

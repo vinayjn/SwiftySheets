@@ -32,10 +32,6 @@ public struct DriveClient: Sendable {
         return response.files
     }
     
-    public func list(query: DriveQuery) async throws(SheetsError) -> [DriveFile] {
-        return try await list(query: query.query)
-    }
-    
     /// Create a fluent query builder for listing Drive files.
     /// ```swift
     /// let reports = try await client.drive.list()
