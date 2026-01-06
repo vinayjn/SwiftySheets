@@ -101,7 +101,7 @@ public extension Spreadsheet {
     // MARK: - Batch Update
     
     @discardableResult
-    func batchUpdate(requests: [BatchUpdateRequest.Request]) async throws(SheetsError) -> BatchUpdateResponse {
+    internal func batchUpdate(requests: [BatchUpdateRequest.Request]) async throws(SheetsError) -> BatchUpdateResponse {
         return try await client.batchUpdate(spreadsheetId: id, requests: requests)
     }
     
@@ -201,7 +201,7 @@ public extension Spreadsheet {
     
     // MARK: - Advanced Operations
     
-    func format(range: SheetRange, format: CellFormat) async throws(SheetsError) {
+    internal func format(range: SheetRange, format: CellFormat) async throws(SheetsError) {
         let sheet = try resolveSheet(for: range)
         let request = FormatCells(sheet: sheet, range: range, format: format)
         try await batchUpdate(requests: [request.request])

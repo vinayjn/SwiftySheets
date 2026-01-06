@@ -13,7 +13,7 @@ public struct DriveClient: Sendable {
     
     // MARK: - Read
     
-    public func list(query: String? = nil) async throws(SheetsError) -> [DriveFile] {
+    internal func list(query: String? = nil) async throws(SheetsError) -> [DriveFile] {
         var url = baseURL.appendingPathComponent("files")
         
         var queryItems: [URLQueryItem] = [

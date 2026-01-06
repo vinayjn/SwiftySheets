@@ -99,6 +99,18 @@ public final class DriveListBuilder: @unchecked Sendable {
         return self
     }
     
+    // MARK: - Custom
+    
+    /// Add a raw custom query string.
+    /// ```swift
+    /// .custom("appProperties has { key = 'val' }")
+    /// ```
+    @discardableResult
+    public func custom(_ query: String) -> DriveListBuilder {
+        queryParts.insert(query)
+        return self
+    }
+    
     // MARK: - Execute
     
     /// Build the query string from accumulated parts.

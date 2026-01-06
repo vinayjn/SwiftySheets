@@ -265,11 +265,11 @@ struct DemoApp {
             values: [["Name", "Email", "Score", "Active", "Joined", "Nickname"]]
         )
         
-        let headerFormat = CellFormat(
-            backgroundColor: .blue,
-            textFormat: TextFormat(foregroundColor: .white, bold: true)
-        )
-        try await spreadsheet!.format(range: SheetRange(parsing: "\(name)!A1:F1"), format: headerFormat)
+        try await spreadsheet!.format(SheetRange(parsing: "\(name)!A1:F1"))
+            .backgroundColor(.blue)
+            .foregroundColor(.white)
+            .bold()
+            .apply()
         
         // Data
         let formatter = DateFormatter()
