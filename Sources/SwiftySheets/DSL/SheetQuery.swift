@@ -8,21 +8,25 @@ struct UncheckedSendable<T>: @unchecked Sendable {
 // MARK: - Query Builder
 
 /// A fluent query builder for fetching and filtering typed rows.
+/// Uses mutable state internally for efficiency, executes on fetch().
 /// ```swift
 /// let employees = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
 ///     .filter { $0.salary > 50000 }
 ///     .sorted(by: \.name)
-///     .fetch()
+///     .execute()
 /// ```
-public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
+public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
     private let spreadsheet: Spreadsheet
     private let range: SheetRange
     private let valueRenderOption: ValueRenderOption
     private let dateTimeRenderOption: DateRenderOption
-    private let filterPredicate: @Sendable (T) -> Bool
-    private let sortComparator: (@Sendable (T, T) -> Bool)?
-    private let limitCount: Int?
-    private let offsetCount: Int?
+    
+    // Mutable state - accumulated during chaining
+    private var filterPredicates: [@Sendable (T) -> Bool] = []
+    private var orPredicates: [@Sendable (T) -> Bool] = []
+    private var sortComparators: [@Sendable (T, T) -> Bool] = []
+    private var _limitCount: Int?
+    private var _offsetCount: Int?
     
     init(
         spreadsheet: Spreadsheet,
@@ -34,30 +38,6 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
         self.range = range
         self.valueRenderOption = valueRenderOption
         self.dateTimeRenderOption = dateTimeRenderOption
-        self.filterPredicate = { _ in true }
-        self.sortComparator = nil
-        self.limitCount = nil
-        self.offsetCount = nil
-    }
-    
-    private init(
-        spreadsheet: Spreadsheet,
-        range: SheetRange,
-        valueRenderOption: ValueRenderOption,
-        dateTimeRenderOption: DateRenderOption,
-        filterPredicate: @escaping @Sendable (T) -> Bool,
-        sortComparator: (@Sendable (T, T) -> Bool)?,
-        limitCount: Int?,
-        offsetCount: Int?
-    ) {
-        self.spreadsheet = spreadsheet
-        self.range = range
-        self.valueRenderOption = valueRenderOption
-        self.dateTimeRenderOption = dateTimeRenderOption
-        self.filterPredicate = filterPredicate
-        self.sortComparator = sortComparator
-        self.limitCount = limitCount
-        self.offsetCount = offsetCount
     }
     
     // MARK: - Filter
@@ -66,33 +46,37 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     /// ```swift
     /// .filter { $0.salary > 50000 }
     /// ```
+    @discardableResult
     public func filter(_ predicate: @escaping @Sendable (T) -> Bool) -> SheetQuery<T> {
-        let currentPredicate = self.filterPredicate
-        return SheetQuery(
-            spreadsheet: spreadsheet,
-            range: range,
-            valueRenderOption: valueRenderOption,
-            dateTimeRenderOption: dateTimeRenderOption,
-            filterPredicate: { currentPredicate($0) && predicate($0) },
-            sortComparator: sortComparator,
-            limitCount: limitCount,
-            offsetCount: offsetCount
-        )
+        filterPredicates.append(predicate)
+        return self
     }
     
     /// Filter rows where a property equals a value.
     /// ```swift
     /// .where(\.department, equals: "Engineering")
     /// ```
+    @discardableResult
     public func `where`<V: Equatable & Sendable>(_ keyPath: KeyPath<T, V>, equals value: V) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { $0[keyPath: safeKeyPath.value] == value }
+    }
+    
+    /// Filter rows where a property does not equal a value.
+    /// ```swift
+    /// .where(\.status, notEquals: "Deleted")
+    /// ```
+    @discardableResult
+    public func `where`<V: Equatable & Sendable>(_ keyPath: KeyPath<T, V>, notEquals value: V) -> SheetQuery<T> {
+        let safeKeyPath = UncheckedSendable(keyPath)
+        return filter { $0[keyPath: safeKeyPath.value] != value }
     }
     
     /// Filter rows where a property is in a set of values.
     /// ```swift
     /// .where(\.status, isIn: ["Active", "Pending"])
     /// ```
+    @discardableResult
     public func `where`<V: Equatable & Sendable>(_ keyPath: KeyPath<T, V>, isIn values: Set<V>) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { values.contains($0[keyPath: safeKeyPath.value]) }
@@ -102,45 +86,31 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     /// ```swift
     /// .where(\.salary, greaterThan: 50000)
     /// ```
+    @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V>, greaterThan value: V) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { $0[keyPath: safeKeyPath.value] > value }
     }
     
     /// Filter rows where a comparable property is less than a value.
+    @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V>, lessThan value: V) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { $0[keyPath: safeKeyPath.value] < value }
-    }
-    
-    /// Filter rows where a string property contains a substring.
-    /// ```swift
-    /// .where(\.name, contains: "Smith")
-    /// ```
-    public func `where`(_ keyPath: KeyPath<T, String>, contains substring: String) -> SheetQuery<T> {
-        let safeKeyPath = UncheckedSendable(keyPath)
-        return filter { $0[keyPath: safeKeyPath.value].contains(substring) }
-    }
-    
-    /// Filter rows where a property does not equal a value.
-    /// ```swift
-    /// .where(\.status, notEquals: "Deleted")
-    /// ```
-    public func `where`<V: Equatable & Sendable>(_ keyPath: KeyPath<T, V>, notEquals value: V) -> SheetQuery<T> {
-        let safeKeyPath = UncheckedSendable(keyPath)
-        return filter { $0[keyPath: safeKeyPath.value] != value }
     }
     
     /// Filter rows where a comparable property is greater than or equal to a value.
     /// ```swift
     /// .where(\.age, greaterThanOrEquals: 18)
     /// ```
+    @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V>, greaterThanOrEquals value: V) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { $0[keyPath: safeKeyPath.value] >= value }
     }
     
     /// Filter rows where a comparable property is less than or equal to a value.
+    @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V>, lessThanOrEquals value: V) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { $0[keyPath: safeKeyPath.value] <= value }
@@ -150,15 +120,27 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     /// ```swift
     /// .where(\.score, between: 50...100)
     /// ```
+    @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V>, between range: ClosedRange<V>) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { range.contains($0[keyPath: safeKeyPath.value]) }
+    }
+    
+    /// Filter rows where a string property contains a substring.
+    /// ```swift
+    /// .where(\.name, contains: "Smith")
+    /// ```
+    @discardableResult
+    public func `where`(_ keyPath: KeyPath<T, String>, contains substring: String) -> SheetQuery<T> {
+        let safeKeyPath = UncheckedSendable(keyPath)
+        return filter { $0[keyPath: safeKeyPath.value].contains(substring) }
     }
     
     /// Filter rows where a string property starts with a prefix.
     /// ```swift
     /// .where(\.email, startsWith: "admin")
     /// ```
+    @discardableResult
     public func `where`(_ keyPath: KeyPath<T, String>, startsWith prefix: String) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { $0[keyPath: safeKeyPath.value].hasPrefix(prefix) }
@@ -168,6 +150,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     /// ```swift
     /// .where(\.email, endsWith: "@company.com")
     /// ```
+    @discardableResult
     public func `where`(_ keyPath: KeyPath<T, String>, endsWith suffix: String) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { $0[keyPath: safeKeyPath.value].hasSuffix(suffix) }
@@ -177,6 +160,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     /// ```swift
     /// .whereNil(\.nickname)
     /// ```
+    @discardableResult
     public func whereNil<V: Sendable>(_ keyPath: KeyPath<T, V?>) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { $0[keyPath: safeKeyPath.value] == nil }
@@ -186,6 +170,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     /// ```swift
     /// .whereNotNil(\.nickname)
     /// ```
+    @discardableResult
     public func whereNotNil<V: Sendable>(_ keyPath: KeyPath<T, V?>) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         return filter { $0[keyPath: safeKeyPath.value] != nil }
@@ -193,30 +178,28 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     
     /// Add an OR condition to the query.
     /// ```swift
-    /// .or { $0.where(\.status, equals: "Active").where(\.isAdmin, equals: true) }
+    /// .or { $0.where(\.status, equals: "Active") }
     /// ```
+    @discardableResult
     public func or(_ builder: (SheetQuery<T>) -> SheetQuery<T>) -> SheetQuery<T> {
-        let currentPredicate = self.filterPredicate
         // Create a fresh query to capture the OR branch predicates
-        let freshQuery = SheetQuery(
+        let freshQuery = SheetQuery<T>(
             spreadsheet: spreadsheet,
             range: range,
             valueRenderOption: valueRenderOption,
             dateTimeRenderOption: dateTimeRenderOption
         )
         let orQuery = builder(freshQuery)
-        let orPredicate = orQuery.filterPredicate
         
-        return SheetQuery(
-            spreadsheet: spreadsheet,
-            range: range,
-            valueRenderOption: valueRenderOption,
-            dateTimeRenderOption: dateTimeRenderOption,
-            filterPredicate: { currentPredicate($0) || orPredicate($0) },
-            sortComparator: sortComparator,
-            limitCount: limitCount,
-            offsetCount: offsetCount
-        )
+        // Combine the OR branch predicates into one
+        let orBranchPredicates = orQuery.filterPredicates
+        if !orBranchPredicates.isEmpty {
+            let combinedOrPredicate: @Sendable (T) -> Bool = { item in
+                orBranchPredicates.allSatisfy { $0(item) }
+            }
+            orPredicates.append(combinedOrPredicate)
+        }
+        return self
     }
     
     // MARK: - Sort
@@ -226,6 +209,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     /// .sorted(by: \.name)
     /// .sorted(by: \.salary, ascending: false)
     /// ```
+    @discardableResult
     public func sorted<V: Comparable & Sendable>(by keyPath: KeyPath<T, V>, ascending: Bool = true) -> SheetQuery<T> {
         let safeKeyPath = UncheckedSendable(keyPath)
         let comparator: @Sendable (T, T) -> Bool = { lhs, rhs in
@@ -233,92 +217,46 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
             let r = rhs[keyPath: safeKeyPath.value]
             return ascending ? l < r : l > r
         }
-        
-        return SheetQuery(
-            spreadsheet: spreadsheet,
-            range: range,
-            valueRenderOption: valueRenderOption,
-            dateTimeRenderOption: dateTimeRenderOption,
-            filterPredicate: filterPredicate,
-            sortComparator: comparator,
-            limitCount: limitCount,
-            offsetCount: offsetCount
-        )
+        sortComparators.append(comparator)
+        return self
     }
     
     /// Add a secondary sort after the primary sort.
     /// ```swift
     /// .sorted(by: \.department).thenSorted(by: \.name)
     /// ```
+    @discardableResult
     public func thenSorted<V: Comparable & Sendable>(by keyPath: KeyPath<T, V>, ascending: Bool = true) -> SheetQuery<T> {
-        guard let existingComparator = sortComparator else {
-            // If no existing sort, just use sorted()
-            return sorted(by: keyPath, ascending: ascending)
-        }
-        
-        let safeKeyPath = UncheckedSendable(keyPath)
-        let newComparator: @Sendable (T, T) -> Bool = { lhs, rhs in
-            // First apply existing comparator
-            if existingComparator(lhs, rhs) { return true }
-            if existingComparator(rhs, lhs) { return false }
-            // If equal by primary sort, apply secondary
-            let l = lhs[keyPath: safeKeyPath.value]
-            let r = rhs[keyPath: safeKeyPath.value]
-            return ascending ? l < r : l > r
-        }
-        
-        return SheetQuery(
-            spreadsheet: spreadsheet,
-            range: range,
-            valueRenderOption: valueRenderOption,
-            dateTimeRenderOption: dateTimeRenderOption,
-            filterPredicate: filterPredicate,
-            sortComparator: newComparator,
-            limitCount: limitCount,
-            offsetCount: offsetCount
-        )
+        // thenSorted just adds another comparator to the chain
+        return sorted(by: keyPath, ascending: ascending)
     }
     
-    // MARK: - Limit
+    // MARK: - Pagination
     
     /// Limit the number of results.
     /// ```swift
     /// .limit(10)
     /// ```
+    @discardableResult
     public func limit(_ count: Int) -> SheetQuery<T> {
-        SheetQuery(
-            spreadsheet: spreadsheet,
-            range: range,
-            valueRenderOption: valueRenderOption,
-            dateTimeRenderOption: dateTimeRenderOption,
-            filterPredicate: filterPredicate,
-            sortComparator: sortComparator,
-            limitCount: count,
-            offsetCount: offsetCount
-        )
+        _limitCount = count
+        return self
     }
     
     /// Skip a number of rows (for pagination).
     /// ```swift
     /// .offset(20).limit(10)  // Page 3
     /// ```
+    @discardableResult
     public func offset(_ count: Int) -> SheetQuery<T> {
-        SheetQuery(
-            spreadsheet: spreadsheet,
-            range: range,
-            valueRenderOption: valueRenderOption,
-            dateTimeRenderOption: dateTimeRenderOption,
-            filterPredicate: filterPredicate,
-            sortComparator: sortComparator,
-            limitCount: limitCount,
-            offsetCount: count
-        )
+        _offsetCount = count
+        return self
     }
     
     // MARK: - Execute
     
-    /// Fetch all rows matching the query.
-    public func fetch() async throws(SheetsError) -> [T] {
+    /// Execute the query and fetch all matching rows.
+    public func execute() async throws(SheetsError) -> [T] {
         // Get all typed values
         var results = try await spreadsheet.values(
             range: range,
@@ -327,34 +265,58 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
             dateTimeRenderOption: dateTimeRenderOption
         )
         
-        // Apply filter
-        results = results.filter(filterPredicate)
+        // Apply AND filters
+        if !filterPredicates.isEmpty {
+            results = results.filter { item in
+                filterPredicates.allSatisfy { $0(item) }
+            }
+        }
         
-        // Apply sort if specified
-        if let comparator = sortComparator {
-            results.sort(by: comparator)
+        // Apply OR predicates (any OR branch passes)
+        if !orPredicates.isEmpty {
+            results = results.filter { item in
+                // Item passes if it passes AND filters OR any OR branch
+                orPredicates.contains { $0(item) }
+            }
+        }
+        
+        // Apply sort (chain of comparators)
+        if !sortComparators.isEmpty {
+            results.sort { lhs, rhs in
+                for comparator in sortComparators {
+                    if comparator(lhs, rhs) { return true }
+                    if comparator(rhs, lhs) { return false }
+                }
+                return false // Equal
+            }
         }
         
         // Apply offset
-        if let offset = offsetCount {
+        if let offset = _offsetCount {
             results = Array(results.dropFirst(offset))
         }
         
         // Apply limit
-        if let limit = limitCount {
+        if let limit = _limitCount {
             results = Array(results.prefix(limit))
         }
         
         return results
     }
     
+    /// Alias for execute() - fetch all rows matching the query.
+    public func fetch() async throws(SheetsError) -> [T] {
+        try await execute()
+    }
+    
     /// Fetch the first row matching the query.
     public func first() async throws(SheetsError) -> T? {
-        try await limit(1).fetch().first
+        _limitCount = 1
+        return try await execute().first
     }
     
     /// Count rows matching the query.
     public func count() async throws(SheetsError) -> Int {
-        try await fetch().count
+        try await execute().count
     }
 }
