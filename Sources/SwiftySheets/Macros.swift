@@ -12,3 +12,6 @@ public macro Column(_ name: String, format: String? = nil) = #externalMacro(modu
 
 @attached(peer)
 public macro Column(index: Int, format: String? = nil) = #externalMacro(module: "SwiftySheetsMacros", type: "ColumnMacro")
+
+@attached(member, names: arbitrary)
+public macro GenerateColumns() = #externalMacro(module: "SwiftySheetsMacros", type: "GenerateColumnsMacro")

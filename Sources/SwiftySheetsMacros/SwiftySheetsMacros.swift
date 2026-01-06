@@ -6,6 +6,7 @@ struct SwiftySheetsMacrosPlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
         SheetRowMacro.self,
         ColumnMacro.self,
-        RangeMacro.self
+        RangeMacro.self,
+        GenerateColumnsMacro.self
     ]
 }
