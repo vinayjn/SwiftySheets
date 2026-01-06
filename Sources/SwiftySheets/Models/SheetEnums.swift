@@ -20,3 +20,8 @@ public enum SortOrder: String, Codable, Sendable {
     case ascending = "ASCENDING"
     case descending = "DESCENDING"
 }
+
+public enum SortDimension: String, Codable, Sendable {
+    case rows = "ROWS"
+    case columns = "COLUMNS"
+}

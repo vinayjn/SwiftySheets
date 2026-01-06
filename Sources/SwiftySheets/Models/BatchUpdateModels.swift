@@ -148,25 +148,56 @@ struct RowData: Encodable, Sendable {
     }
 }
 
-struct CellData: Encodable, Sendable {
-    let userEnteredValue: ExtendedValue?
-    let userEnteredFormat: CellFormat?
+// MARK: - Cell Value (Type Safe)
+
+public enum CellValue: Codable, Sendable {
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case formula(String)
+    case none
     
-    init(userEnteredValue: ExtendedValue? = nil, userEnteredFormat: CellFormat? = nil) {
-        self.userEnteredValue = userEnteredValue
-        self.userEnteredFormat = userEnteredFormat
+    enum CodingKeys: String, CodingKey {
+        case stringValue
+        case numberValue
+        case boolValue
+        case formulaValue
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .string(let s): try container.encode(s, forKey: .stringValue)
+        case .number(let n): try container.encode(n, forKey: .numberValue)
+        case .bool(let b): try container.encode(b, forKey: .boolValue)
+        case .formula(let f): try container.encode(f, forKey: .formulaValue)
+        case .none: break
+        }
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let s = try? container.decode(String.self, forKey: .stringValue) {
+            self = .string(s)
+        } else if let n = try? container.decode(Double.self, forKey: .numberValue) {
+            self = .number(n)
+        } else if let b = try? container.decode(Bool.self, forKey: .boolValue) {
+            self = .bool(b)
+        } else if let f = try? container.decode(String.self, forKey: .formulaValue) {
+            self = .formula(f)
+        } else {
+            self = .none
+        }
     }
 }
 
-struct ExtendedValue: Encodable, Sendable {
-    let stringValue: String?
-    let numberValue: Double?
-    let boolValue: Bool?
+struct CellData: Encodable, Sendable {
+    let userEnteredValue: CellValue?
+    let userEnteredFormat: CellFormat?
     
-    init(stringValue: String? = nil, numberValue: Double? = nil, boolValue: Bool? = nil) {
-        self.stringValue = stringValue
-        self.numberValue = numberValue
-        self.boolValue = boolValue
+    init(userEnteredValue: CellValue? = nil, userEnteredFormat: CellFormat? = nil) {
+        self.userEnteredValue = userEnteredValue
+        self.userEnteredFormat = userEnteredFormat
     }
 }
 
