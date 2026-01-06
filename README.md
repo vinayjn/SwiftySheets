@@ -77,7 +77,7 @@ Filter, sort, and paginate data with a fluent, type-safe API. [📚 Full Referen
 let highScorers = try await spreadsheet.query(User.self, in: #Range("A:D"))
     .where(\.score, greaterThan: 80)
     .sorted(by: \.score, ascending: false)
-    .fetch()
+    .execute()
 
 // Complex query with filtering + sorting + pagination
 let page3ActiveUsers = try await spreadsheet.query(User.self, in: #Range("A:D"))
@@ -87,7 +87,7 @@ let page3ActiveUsers = try await spreadsheet.query(User.self, in: #Range("A:D"))
     .sorted(by: \.score, ascending: false)
     .offset(20)  // Skip first 20 (pages 1-2)
     .limit(10)   // Get 10 (page 3)
-    .fetch()
+    .execute()
 
 // Quick helpers
 let count = try await spreadsheet.query(User.self, in: #Range("A:D"))
