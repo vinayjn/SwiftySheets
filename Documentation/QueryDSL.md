@@ -5,7 +5,7 @@ SwiftySheets provides a powerful, type-safe Query DSL for filtering, sorting, an
 ## Quick Start
 
 ```swift
-let results = try await spreadsheet.query(User.self, in: #Range("A:D"))
+let results = try await spreadsheet.query(User.self, in: Column.A...Column.D)
     .where(\.isActive, equals: true)
     .where(\.score, greaterThan: 50)
     .sorted(by: \.score, ascending: false)
@@ -62,7 +62,7 @@ let results = try await spreadsheet.query(User.self, in: #Range("A:D"))
 
 ```swift
 // Example: Active users OR admins
-let results = try await spreadsheet.query(User.self, in: #Range("A:D"))
+let results = try await spreadsheet.query(User.self, in: Column.A...Column.D)
     .where(\.isActive, equals: true)
     .or { $0.where(\.isAdmin, equals: true) }
     .fetch()
@@ -77,7 +77,7 @@ let results = try await spreadsheet.query(User.self, in: #Range("A:D"))
 
 ```swift
 // Sort by department, then by name within each department
-let results = try await spreadsheet.query(User.self, in: #Range("A:D"))
+let results = try await spreadsheet.query(User.self, in: Column.A...Column.D)
     .sorted(by: \.department)
     .thenSorted(by: \.name)
     .fetch()
@@ -92,7 +92,7 @@ let results = try await spreadsheet.query(User.self, in: #Range("A:D"))
 
 ```swift
 // Get page 3 (rows 21-30)
-let page3 = try await spreadsheet.query(User.self, in: #Range("A:D"))
+let page3 = try await spreadsheet.query(User.self, in: Column.A...Column.D)
     .sorted(by: \.createdAt, ascending: false)
     .offset(20)
     .limit(10)
@@ -120,7 +120,7 @@ When you call `execute()`, operations are applied in this order:
 
 ```swift
 // Complex query combining all features
-let topActiveEngineers = try await spreadsheet.query(Employee.self, in: #Range("A:F"))
+let topActiveEngineers = try await spreadsheet.query(Employee.self, in: Column.A...Column.F)
     // Filters (AND'd together)
     .where(\.department, equals: "Engineering")
     .where(\.status, notEquals: "Terminated")

@@ -6,10 +6,11 @@ A modern, type-safe Swift library for interacting with the Google Sheets API. Bu
 
 - **🚀 Modern Concurrency**: Actor-based `Client`, fully `async`/`await` powered, and strictly `Sendable`.
 - **🛡️ Type-Safe Macros**: Map rows to structs securely with `@SheetRow` and `@Column`.
+- **⚡️ Autocomplete DSL**: Access columns safely (`Column.A[1]`) with compiler-generated static properties.
 - **🔍 Fluent Query DSL**: Filter, sort, and limit data using Swift KeyPaths (`.where(\.age, equals: 25)`).
 - **🌊 Fluent Builders**: Chainable APIs for queries, formatting, and Drive operations.
 - **🎨 Formatting DSL**: Declarative syntax for styling cells (`BackgroundColor(.blue)`).
-- **🧮 Subscripts**: Intuitive access to cells and ranges (`spreadsheet["A1"]`).
+- **🧮 Subscripts**: Intuitive access to ranges (`spreadsheet[Column.A[1]...Column.B[5]]`).
 - **🔐 Typed Errors**: Explicit error handling with `SheetsError`.
 - **🚕 Drive Integration**: Built-in support for managing Drive files.
 
@@ -62,10 +63,13 @@ let users: [User] = try await spreadsheet.values(range: #Range("Sheet1!A:D"))
 let newUsers = [User(name: "Alice", email: "alice@test.com", score: 100, joinDate: Date())]
 try await spreadsheet.appendValues(range: #Range("Sheet1!A1"), values: newUsers)
 
-// SUBSCRIPTS
-let cellValue = try await spreadsheet["A1"]
-try await spreadsheet["B2"] = "Updated Value"
-try await spreadsheet["C1:C10"].clear()
+// SUBSCRIPTS (Type-Safe)
+let cellValue = try await spreadsheet[Column.A[1]].stringValue()
+try await spreadsheet[Column.B[2]].set("Updated Value")
+try await spreadsheet[Column.C[1]...Column.C[10]].clear()
+
+// Dynamic Strings (Explicit Parsing)
+try await spreadsheet[try SheetRange(parsing: "A1")].set("Dynamic")
 ```
 
 ## 💡 Advanced Usage
@@ -102,7 +106,7 @@ let topUser = try await spreadsheet.query(User.self, in: #Range("A:D"))
 ### 🎨 Cell Formatting
 Apply styles with a fluent builder.
 ```swift
-try await spreadsheet.format(#Range("A1:D1"))
+try await spreadsheet.format(Column.A[1]...Column.D[1])
     .backgroundColor(.blue)
     .bold()
     .foregroundColor(.white)

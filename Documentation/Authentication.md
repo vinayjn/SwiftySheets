@@ -75,7 +75,7 @@ let client = Client(credentials: credentials)
 
 // Read a public spreadsheet
 let spreadsheet = try await client.spreadsheet(id: "public-spreadsheet-id")
-let values: [String] = try await spreadsheet.values(range: "Sheet1!A1:B10")
+let values: [String] = try await spreadsheet.values(range: Column.A[1]...Column.B[10])
 ```
 
 ## Summary
