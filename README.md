@@ -69,23 +69,32 @@ try await spreadsheet["C1:C10"].clear()
 ## 💡 Advanced Usage
 
 ### 🔍 Query DSL
-Filter and query data directly from Sheets using type-safe KeyPaths.
+Filter, sort, and paginate data with a fluent, type-safe API.
 ```swift
+// Simple query
 let highScorers = try await spreadsheet.query(User.self, in: #Range("A:D"))
     .where(\.score, greaterThan: 80)
-    .where(\.email, contains: "@test.com")
     .sorted(by: \.score, ascending: false)
-    .limit(10)
     .fetch()
-```
 
-### 📄 Pagination
-Efficiently paginate through large datasets.
-```swift
-let page3 = try await spreadsheet.query(User.self, in: #Range("A:D"))
-    .offset(20)  // Skip first 20 rows
-    .limit(10)   // Get 10 rows
+// Complex query with filtering + sorting + pagination
+let page3ActiveUsers = try await spreadsheet.query(User.self, in: #Range("A:D"))
+    .where(\.isActive, equals: true)
+    .where(\.score, greaterThan: 50)
+    .where(\.email, contains: "@company.com")
+    .sorted(by: \.score, ascending: false)
+    .offset(20)  // Skip first 20 (pages 1-2)
+    .limit(10)   // Get 10 (page 3)
     .fetch()
+
+// Quick helpers
+let count = try await spreadsheet.query(User.self, in: #Range("A:D"))
+    .where(\.isActive, equals: true)
+    .count()
+
+let topUser = try await spreadsheet.query(User.self, in: #Range("A:D"))
+    .sorted(by: \.score, ascending: false)
+    .first()
 ```
 
 ### 🎨 Cell Formatting
