@@ -32,6 +32,8 @@ import SwiftySheets
 
 let credentials = try ServiceAccountCredentials(jsonPath: "path/to/service-account.json")
 let client = Client(credentials: credentials)
+
+// For OAuth (mobile) or API Key support, see [Authentication Guide](Documentation/Authentication.md).
 ```
 
 ### 2. Define Your Model
