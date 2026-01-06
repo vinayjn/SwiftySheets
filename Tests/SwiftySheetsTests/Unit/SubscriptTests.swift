@@ -1,5 +1,8 @@
 @testable import SwiftySheets
 import XCTest
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 final class SubscriptTests: XCTestCase, @unchecked Sendable {
     private var client: Client!
