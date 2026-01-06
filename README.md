@@ -79,12 +79,13 @@ let highScorers = try await spreadsheet.query(User.self, in: #Range("A:D"))
     .fetch()
 ```
 
-### 🌊 Data Streaming
-Process large datasets memory-efficiently using `AsyncSequence`.
+### 📄 Pagination
+Efficiently paginate through large datasets.
 ```swift
-for try await user in spreadsheet.stream(User.self, in: #Range("A:Z")) {
-    print("Processing user: \(user.name)")
-}
+let page3 = try await spreadsheet.query(User.self, in: #Range("A:D"))
+    .offset(20)  // Skip first 20 rows
+    .limit(10)   // Get 10 rows
+    .fetch()
 ```
 
 ### 🎨 Cell Formatting

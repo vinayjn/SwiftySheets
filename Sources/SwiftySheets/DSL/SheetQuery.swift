@@ -22,6 +22,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     private let filterPredicate: @Sendable (T) -> Bool
     private let sortComparator: (@Sendable (T, T) -> Bool)?
     private let limitCount: Int?
+    private let offsetCount: Int?
     
     init(
         spreadsheet: Spreadsheet,
@@ -36,6 +37,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
         self.filterPredicate = { _ in true }
         self.sortComparator = nil
         self.limitCount = nil
+        self.offsetCount = nil
     }
     
     private init(
@@ -45,7 +47,8 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
         dateTimeRenderOption: DateRenderOption,
         filterPredicate: @escaping @Sendable (T) -> Bool,
         sortComparator: (@Sendable (T, T) -> Bool)?,
-        limitCount: Int?
+        limitCount: Int?,
+        offsetCount: Int?
     ) {
         self.spreadsheet = spreadsheet
         self.range = range
@@ -54,6 +57,7 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
         self.filterPredicate = filterPredicate
         self.sortComparator = sortComparator
         self.limitCount = limitCount
+        self.offsetCount = offsetCount
     }
     
     // MARK: - Filter
@@ -71,7 +75,8 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
             dateTimeRenderOption: dateTimeRenderOption,
             filterPredicate: { currentPredicate($0) && predicate($0) },
             sortComparator: sortComparator,
-            limitCount: limitCount
+            limitCount: limitCount,
+            offsetCount: offsetCount
         )
     }
     
@@ -139,7 +144,8 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
             dateTimeRenderOption: dateTimeRenderOption,
             filterPredicate: filterPredicate,
             sortComparator: comparator,
-            limitCount: limitCount
+            limitCount: limitCount,
+            offsetCount: offsetCount
         )
     }
     
@@ -157,7 +163,25 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
             dateTimeRenderOption: dateTimeRenderOption,
             filterPredicate: filterPredicate,
             sortComparator: sortComparator,
-            limitCount: count
+            limitCount: count,
+            offsetCount: offsetCount
+        )
+    }
+    
+    /// Skip a number of rows (for pagination).
+    /// ```swift
+    /// .offset(20).limit(10)  // Page 3
+    /// ```
+    public func offset(_ count: Int) -> SheetQuery<T> {
+        SheetQuery(
+            spreadsheet: spreadsheet,
+            range: range,
+            valueRenderOption: valueRenderOption,
+            dateTimeRenderOption: dateTimeRenderOption,
+            filterPredicate: filterPredicate,
+            sortComparator: sortComparator,
+            limitCount: limitCount,
+            offsetCount: count
         )
     }
     
@@ -179,6 +203,11 @@ public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
         // Apply sort if specified
         if let comparator = sortComparator {
             results.sort(by: comparator)
+        }
+        
+        // Apply offset
+        if let offset = offsetCount {
+            results = Array(results.dropFirst(offset))
         }
         
         // Apply limit

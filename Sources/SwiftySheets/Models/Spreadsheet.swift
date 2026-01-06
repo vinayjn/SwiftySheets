@@ -172,47 +172,7 @@ public extension Spreadsheet {
             valueInputOption: valueInputOption
         )
     }
-    
-    // MARK: - Streaming (AsyncSequence)
-    
-    /// Stream rows from a range as an AsyncSequence.
-    /// ```swift
-    /// for try await row in spreadsheet.rows(in: #Range("A:Z")) {
-    ///     print(row)
-    /// }
-    /// ```
-    func rows(
-        in range: SheetRange,
-        valueRenderOption: ValueRenderOption = .unformatted,
-        dateTimeRenderOption: DateRenderOption = .serialNumber
-    ) -> RowAsyncSequence {
-        RowAsyncSequence(
-            spreadsheet: self,
-            range: range,
-            valueRenderOption: valueRenderOption,
-            dateTimeRenderOption: dateTimeRenderOption
-        )
-    }
-    
-    /// Stream typed rows from a range as an AsyncSequence.
-    /// ```swift
-    /// for try await employee in spreadsheet.stream(Employee.self, in: #Range("A:D")) {
-    ///     print(employee.name)
-    /// }
-    /// ```
-    func stream<T: SheetRowDecodable & Sendable>(
-        _ type: T.Type,
-        in range: SheetRange,
-        valueRenderOption: ValueRenderOption = .unformatted,
-        dateTimeRenderOption: DateRenderOption = .serialNumber
-    ) -> TypedRowAsyncSequence<T> {
-        TypedRowAsyncSequence(
-            spreadsheet: self,
-            range: range,
-            valueRenderOption: valueRenderOption,
-            dateTimeRenderOption: dateTimeRenderOption
-        )
-    }
+
     
     // MARK: - Query DSL
     
