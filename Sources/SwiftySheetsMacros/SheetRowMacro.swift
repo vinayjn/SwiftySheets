@@ -12,14 +12,7 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [ExtensionDeclSyntax] {
-        // Return extension with conformances
-        // We know we want SheetRowCodable, Equatable, Hashable
-        // But users might strictly want only what they asked for?
-        // The macro definition explicitly lists them, so we should provide them.
-        
-        // We can generate one extension for all or separate.
-        // Let's generate one.
-        // extension <Type>: SheetRowCodable, Equatable, Hashable {}
+        // Generate extension with conformances
         
         let decl: ExtensionDeclSyntax = try ExtensionDeclSyntax("extension \(type.trimmed): SheetRowCodable, Equatable, Hashable {}")
         return [decl]
@@ -62,7 +55,7 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
                 $0.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == "Column"
             }), let args = attribute.as(AttributeSyntax.self)?.arguments?.as(LabeledExprListSyntax.self) {
                  
-                // Iterate arguments to find name and format
+
                 for arg in args {
                     if let label = arg.label?.text {
                         if label == "format" {
@@ -106,7 +99,7 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
             let safeRead = "row.count > \(col) ? row[\(col)] : \"\""
             let rawVar = "raw_\(p.name)"
             
-            // Conversion logic
+
             var conversion = ""
             if cleanType == "String" {
                 if isOptional {
@@ -153,7 +146,7 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
                     // Note: invalid date parse -> nil. Empty string -> nil.
                     conversion = "let \(rawVar) = \(safeRead); self.\(p.name) = \(rawVar).isEmpty ? nil : \(parser)"
                 } else {
-                    // Force unwrap or default? Default to Date() (current)
+                    // Default to Date()
                     conversion = "self.\(p.name) = \(parser) ?? Date()"
                 }
             } else {

@@ -64,7 +64,6 @@ public struct DriveClient: Sendable {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // Use type.mimeType
         let metadata = CreateFileRequest(name: name, mimeType: type.mimeType, parents: parents)
         guard let body = try? JSONEncoder().encode(metadata) else {
             throw .invalidRequest

@@ -356,7 +356,6 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
     }
     
 
-
     
     /// Fetch the first row matching the query.
     public func first() async throws(SheetsError) -> T? {

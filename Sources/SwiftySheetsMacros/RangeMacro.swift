@@ -22,7 +22,7 @@ public struct RangeMacro: ExpressionMacro {
         // Groups: 1=SheetName(incl quotes/!), 2=SheetName(pure), 3=StartCol, 4=StartRow, 5=EndPart, 6=EndCol, 7=EndRow
         let pattern = #"^('?([^'!]+)'?!)?([A-Za-z]+)(\d+)?(:([A-Za-z]+)(\d+)?)?$"#
         
-        // Check Validity
+
         // Note: NSRegularExpression is available in macros (Foundation).
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
              // Should not happen with static pattern
@@ -35,7 +35,7 @@ public struct RangeMacro: ExpressionMacro {
             return "SheetRange()"
         }
         
-        // Helper to extract group
+
         func extract(_ group: Int) -> String? {
             guard group < match.numberOfRanges else { return nil }
             let r = match.range(at: group)
@@ -49,11 +49,9 @@ public struct RangeMacro: ExpressionMacro {
         let endCol = extract(6)
         let endRow = extract(7)
         
-        // Validation: Logic
-        // If : exists, EndCol OR EndRow must exist? Or redundant check?
-        // Regex handles structure.
+
         
-        // Construct optimized code
+
         var args: [String] = []
         if let s = sheetName { args.append("sheetName: \"\(s)\"") }
         if let sc = startCol { args.append("startColumn: \"\(sc)\"") }

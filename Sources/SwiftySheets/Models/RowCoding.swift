@@ -10,4 +10,3 @@ public protocol SheetRowEncodable {
 
 public typealias SheetRowCodable = SheetRowDecodable & SheetRowEncodable
 
-// Default implementation for basic types if needed, or specialized decoders

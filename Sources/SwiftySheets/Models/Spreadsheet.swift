@@ -218,7 +218,6 @@ public extension Spreadsheet {
         FormatBuilder(spreadsheet: self, range: range)
     }
     
-
     
     func sort(range: SheetRange, column: Int, ascending: Bool = true) async throws(SheetsError) {
         let sheet = try resolveSheet(for: range)

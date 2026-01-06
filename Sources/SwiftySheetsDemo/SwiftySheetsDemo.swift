@@ -23,7 +23,7 @@ struct DemoApp {
     var client: Client?
     var spreadsheet: Spreadsheet?
     
-    // Constant string
+
     let demoSheetName = "DemoSheet"
     
     mutating func run() async {
@@ -68,7 +68,7 @@ struct DemoApp {
                 shouldExit = await runSpreadsheetMenu()
             } else {
                 print("📍 MANAGER MODE: (No Spreadsheet Open)")
-                // Pass client safely
+
                 guard client != nil else {
                      print("❌ Client not initialized")
                      return
@@ -259,7 +259,7 @@ struct DemoApp {
         let name = demoSheetName
         print("📝 Writing Headers & Dummy Data...")
         
-        // Headers
+
         _ = try await spreadsheet!.updateValues(
             range: SheetRange(parsing: "\(name)!A1:F1"),
             values: [["Name", "Email", "Score", "Active", "Joined", "Nickname"]]
@@ -271,7 +271,7 @@ struct DemoApp {
             .bold()
             .apply()
         
-        // Data
+
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let users = [
