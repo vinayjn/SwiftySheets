@@ -7,7 +7,7 @@ A modern, type-safe Swift library for interacting with the Google Sheets API. Bu
 - **🚀 Modern Concurrency**: Actor-based `Client`, fully `async`/`await` powered, and strictly `Sendable`.
 - **🛡️ Type-Safe Macros**: Map rows to structs securely with `@SheetRow` and `@Column`.
 - **🔍 Fluent Query DSL**: Filter, sort, and limit data using Swift KeyPaths (`.where(\.age, equals: 25)`).
-- **🌊 Async Streams**: Memory-efficient streaming of large datasets (`for try await row in ...`).
+- **🌊 Fluent Builders**: Chainable APIs for queries, formatting, and Drive operations.
 - **🎨 Formatting DSL**: Declarative syntax for styling cells (`BackgroundColor(.blue)`).
 - **🧮 Subscripts**: Intuitive access to cells and ranges (`spreadsheet["A1"]`).
 - **🔐 Typed Errors**: Explicit error handling with `SheetsError`.

@@ -103,7 +103,8 @@ let page3 = try await spreadsheet.query(User.self, in: #Range("A:D"))
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `fetch()` | `[T]` | Execute query and return all matching rows |
+| `execute()` | `[T]` | Execute query and return all matching rows |
+| `fetch()` | `[T]` | Alias for `execute()` |
 | `first()` | `T?` | Return first matching row or nil |
 | `count()` | `Int` | Return count of matching rows |
 
@@ -145,3 +146,10 @@ let topActiveEngineers = try await spreadsheet.query(Employee.self, in: #Range("
 - Google Sheets API doesn't support server-side filtering, so large datasets will still be fetched entirely
 - Use specific ranges (e.g., `A:D` instead of `A:Z`) to minimize data transfer
 - The `.limit()` operation reduces memory usage after filtering
+
+## Idempotency
+
+- **Typed `.where()` methods are idempotent** - calling the same filter twice has no effect
+- **Custom `.filter()` closures always add** - closures can't be compared for deduplication
+- **Order of filters doesn't matter** - all filters are AND'd together
+- **Sort order matters** - first `sorted()` is primary, subsequent `thenSorted()` are secondary
