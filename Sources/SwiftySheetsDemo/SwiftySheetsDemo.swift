@@ -176,7 +176,8 @@ struct DemoApp {
         print("6. 🔃 Sort Data")
         print("7. 🧹 Clear Data")
         print("8. 📏 Resize Sheet (DSL)")
-        print("9. 🔙 Close Spreadsheet (Back to Menu)")
+        print("9. 📊 Bulk Data + Pagination Demo")
+        print("c. 🔙 Close Spreadsheet (Back to Menu)")
         print("0. 🗑️ Delete This Spreadsheet")
         print("Enter choice: ", terminator: "")
         
@@ -193,7 +194,8 @@ struct DemoApp {
             case "6": try await sortData()
             case "7": try await clearData()
             case "8": try await resizeSheet()
-            case "9": 
+            case "9": try await bulkDataAndPaginationDemo()
+            case "c": 
                 spreadsheet = nil
                 print("🔙 Closed.")
             case "0":
@@ -369,5 +371,93 @@ struct DemoApp {
         }
         try await spreadsheet!.refreshMetadata()
         print("✅ Resized.")
+    }
+    
+    mutating func bulkDataAndPaginationDemo() async throws {
+        guard let s = spreadsheet else { return }
+        let name = demoSheetName
+        
+        print("📊 Bulk Data + Pagination Demo")
+        print("   This demo will:")
+        print("   1. Generate 50 random users")
+        print("   2. Write them to the sheet")
+        print("   3. Query with pagination (10 per page)")
+        print("")
+        print("Continue? (y/n): ", terminator: "")
+        guard readLine() == "y" else { return }
+        
+        // Step 1: Generate bulk data
+        print("\n🔄 Generating 50 random users...")
+        let names = ["Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Henry", "Ivy", "Jack"]
+        let domains = ["example.com", "test.org", "demo.io"]
+        var users: [DemoUser] = []
+        
+        for i in 1...50 {
+            let name = names[i % names.count]
+            let domain = domains[i % domains.count]
+            let score = Int.random(in: 10...100)
+            let daysAgo = Double.random(in: 0...365)
+            let joinDate = Date().addingTimeInterval(-daysAgo * 86400)
+            
+            users.append(DemoUser(
+                name: "\(name) \(i)",
+                email: "\(name.lowercased())\(i)@\(domain)",
+                score: score,
+                isActive: i % 3 != 0,
+                joinDate: joinDate,
+                nickname: i % 5 == 0 ? "Nick\(i)" : nil
+            ))
+        }
+        
+        // Step 2: Clear and write data
+        print("📝 Writing 50 users to sheet...")
+        try await s.clearValues(range: SheetRange(parsing: "\(name)!A2:F"))
+        
+        // Write headers first
+        _ = try await s.updateValues(
+            range: SheetRange(parsing: "\(name)!A1:F1"),
+            values: [["Name", "Email", "Score", "Active", "Joined", "Nickname"]]
+        )
+        
+        // Write all users
+        let values = try users.map { try $0.encodeRow() }
+        try await s.updateValues(range: SheetRange(parsing: "\(name)!A2"), values: values)
+        print("✅ Written 50 users.")
+        
+        // Step 3: Demonstrate pagination
+        print("\n📄 Demonstrating Pagination (10 per page):")
+        
+        let pageSize = 10
+        let totalPages = 5
+        
+        for page in 1...totalPages {
+            let offset = (page - 1) * pageSize
+            
+            let pageUsers = try await s.query(DemoUser.self, in: SheetRange(parsing: "\(name)!A2:F"))
+                .sorted(by: \.score, ascending: false)  // Sort by score descending
+                .offset(offset)
+                .limit(pageSize)
+                .fetch()
+            
+            print("\n   📖 Page \(page) (offset: \(offset), limit: \(pageSize)):")
+            for (i, user) in pageUsers.enumerated() {
+                print("      [\(offset + i + 1)] \(user.name) - Score: \(user.score)")
+            }
+        }
+        
+        // Bonus: Show filtering + pagination
+        print("\n🔍 Bonus: Active users with score > 50 (first 5):")
+        let filtered = try await s.query(DemoUser.self, in: SheetRange(parsing: "\(name)!A2:F"))
+            .where(\.isActive, equals: true)
+            .where(\.score, greaterThan: 50)
+            .sorted(by: \.score, ascending: false)
+            .limit(5)
+            .fetch()
+        
+        for user in filtered {
+            print("      ✅ \(user.name) - Score: \(user.score)")
+        }
+        
+        print("\n🎉 Pagination demo complete!")
     }
 }
