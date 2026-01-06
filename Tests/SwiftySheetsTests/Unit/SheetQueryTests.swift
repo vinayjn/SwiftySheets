@@ -175,6 +175,190 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         mockSession.mockData = try! JSONEncoder().encode(valueRange)
         mockSession.mockResponse = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 200, httpVersion: nil, headerFields: nil)
     }
+    
+    // MARK: - New Query Operation Tests
+    
+    func testQueryNotEquals() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["Alice", "Engineering", "60000", "Active"],
+            ["Bob", "Engineering", "55000", "Deleted"],
+            ["Charlie", "Marketing", "50000", "Active"]
+        ])
+        
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .where(\.status, notEquals: "Deleted")
+            .fetch()
+        
+        XCTAssertEqual(results.count, 2)
+        XCTAssertFalse(results.contains { $0.name == "Bob" })
+    }
+    
+    func testQueryGreaterThanOrEquals() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["A", "Dept", "49000", "Active"],
+            ["B", "Dept", "50000", "Active"],
+            ["C", "Dept", "51000", "Active"]
+        ])
+        
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .where(\.salaryInt, greaterThanOrEquals: 50000)
+            .fetch()
+        
+        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(results.contains { $0.name == "B" })
+        XCTAssertTrue(results.contains { $0.name == "C" })
+    }
+    
+    func testQueryLessThanOrEquals() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["A", "Dept", "49000", "Active"],
+            ["B", "Dept", "50000", "Active"],
+            ["C", "Dept", "51000", "Active"]
+        ])
+        
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .where(\.salaryInt, lessThanOrEquals: 50000)
+            .fetch()
+        
+        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(results.contains { $0.name == "A" })
+        XCTAssertTrue(results.contains { $0.name == "B" })
+    }
+    
+    func testQueryBetween() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["A", "Dept", "40000", "Active"],
+            ["B", "Dept", "55000", "Active"],
+            ["C", "Dept", "70000", "Active"],
+            ["D", "Dept", "90000", "Active"]
+        ])
+        
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .where(\.salaryInt, between: 50000...75000)
+            .fetch()
+        
+        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(results.contains { $0.name == "B" })
+        XCTAssertTrue(results.contains { $0.name == "C" })
+    }
+    
+    func testQueryStartsWith() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["admin@company.com", "Dept", "1", "Active"],
+            ["user@company.com", "Dept", "2", "Active"],
+            ["admin_backup@company.com", "Dept", "3", "Active"]
+        ])
+        
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .where(\.name, startsWith: "admin")
+            .fetch()
+        
+        XCTAssertEqual(results.count, 2)
+    }
+    
+    func testQueryEndsWith() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["alice@company.com", "Dept", "1", "Active"],
+            ["bob@external.org", "Dept", "2", "Active"],
+            ["charlie@company.com", "Dept", "3", "Active"]
+        ])
+        
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .where(\.name, endsWith: "@company.com")
+            .fetch()
+        
+        XCTAssertEqual(results.count, 2)
+    }
+    
+    func testQueryThenSortedBy() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["Charlie", "Engineering", "50000", "Active"],
+            ["Alice", "Engineering", "60000", "Active"],
+            ["Bob", "Marketing", "55000", "Active"],
+            ["David", "Engineering", "45000", "Active"]
+        ])
+        
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .sorted(by: \.department)
+            .thenSorted(by: \.name)
+            .fetch()
+        
+        // Engineering comes first (alphabetically), then Marketing
+        // Within Engineering: Alice, Charlie, David (alphabetically)
+        XCTAssertEqual(results[0].name, "Alice")
+        XCTAssertEqual(results[1].name, "Charlie")
+        XCTAssertEqual(results[2].name, "David")
+        XCTAssertEqual(results[3].name, "Bob")
+    }
+    
+    func testQueryOffset() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["A", "Dept", "1", "Active"],
+            ["B", "Dept", "2", "Active"],
+            ["C", "Dept", "3", "Active"],
+            ["D", "Dept", "4", "Active"],
+            ["E", "Dept", "5", "Active"]
+        ])
+        
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .offset(2)
+            .limit(2)
+            .fetch()
+        
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].name, "C")
+        XCTAssertEqual(results[1].name, "D")
+    }
+    
+    func testQueryComplexCombination() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+        
+        mockValues([
+            ["Alice", "Engineering", "80000", "Active"],
+            ["Bob", "Engineering", "50000", "Inactive"],
+            ["Charlie", "Marketing", "60000", "Active"],
+            ["David", "Engineering", "70000", "Active"],
+            ["Eve", "Engineering", "90000", "Active"]
+        ])
+        
+        // Filter: Engineering + Active + salary between 60k-85k, sorted by salary desc, limit 2
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .where(\.department, equals: "Engineering")
+            .where(\.status, equals: "Active")
+            .where(\.salaryInt, between: 60000...85000)
+            .sorted(by: \.salaryInt, ascending: false)
+            .limit(2)
+            .fetch()
+        
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].name, "Alice")  // 80k
+        XCTAssertEqual(results[1].name, "David")  // 70k
+    }
 }
 
 @SheetRow
@@ -188,3 +372,4 @@ private struct Employee: Sendable {
         Int(salary) ?? 0
     }
 }
+

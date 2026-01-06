@@ -69,7 +69,7 @@ try await spreadsheet["C1:C10"].clear()
 ## 💡 Advanced Usage
 
 ### 🔍 Query DSL
-Filter, sort, and paginate data with a fluent, type-safe API.
+Filter, sort, and paginate data with a fluent, type-safe API. [📚 Full Reference](Documentation/QueryDSL.md)
 ```swift
 // Simple query
 let highScorers = try await spreadsheet.query(User.self, in: #Range("A:D"))
