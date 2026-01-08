@@ -16,7 +16,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/googleapis/google-auth-library-swift.git", from: "0.5.0"),
-        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.0-latest"),
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0-latest"),
     ],
     targets: [
         // Core Library
