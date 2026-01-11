@@ -145,6 +145,10 @@ SwiftySheets includes a comprehensive test suite (Unit & Integration).
 swift test
 ```
 
+## 🤖 AI Coding Agents
+
+SwiftySheets includes a comprehensive [skills document](.agent/skills/swiftysheets.md) for AI coding assistants. If you're using an AI-powered IDE or coding agent, it can reference this file to understand the library's APIs, patterns, and best practices.
+
 ## 📄 License
 
 MIT License. See [LICENSE](LICENSE) for details.
