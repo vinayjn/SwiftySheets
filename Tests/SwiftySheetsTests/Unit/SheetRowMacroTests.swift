@@ -103,23 +103,27 @@ final class SheetRowMacroTests: XCTestCase {
             expandedSource: """
             struct Record {
                 var createdAt: Date
-            }
 
-            extension Record: SheetRowCodable, Equatable, Hashable {
-                private static let _iso8601Formatter = ISO8601DateFormatter()
+                private nonisolated(unsafe) static let _iso8601Formatter = ISO8601DateFormatter()
+
                 public init(row: [String]) throws {
 
                     // createdAt: Date
                     self.createdAt = Self._iso8601Formatter.date(from: row.count > 0 ? row[0] : "") ?? Date()
                 }
+
                 public func encodeRow() throws -> [String] {
                     var values = Array(repeating: "", count: 1)
                     if values.count > 0 { values[0] = Self._iso8601Formatter.string(from: self.createdAt) }
                     return values
                 }
+
                 public init(createdAt: Date) {
                     self.createdAt = createdAt
                 }
+            }
+
+            extension Record: SheetRowCodable, Equatable, Hashable {
             }
             """,
             macros: testMacros
@@ -139,27 +143,31 @@ final class SheetRowMacroTests: XCTestCase {
             expandedSource: """
             struct Record {
                 var date: Date
-            }
 
-            extension Record: SheetRowCodable, Equatable, Hashable {
-                private static let _dateFormatter0: DateFormatter = {
+                private nonisolated(unsafe) static let _dateFormatter0: DateFormatter = {
                     let f = DateFormatter()
                     f.dateFormat = "yyyy-MM-dd"
                     return f
                 }()
+
                 public init(row: [String]) throws {
 
                     // date: Date
                     self.date = Self._dateFormatter0.date(from: row.count > 0 ? row[0] : "") ?? Date()
                 }
+
                 public func encodeRow() throws -> [String] {
                     var values = Array(repeating: "", count: 1)
                     if values.count > 0 { values[0] = Self._dateFormatter0.string(from: self.date) }
                     return values
                 }
+
                 public init(date: Date) {
                     self.date = date
                 }
+            }
+
+            extension Record: SheetRowCodable, Equatable, Hashable {
             }
             """,
             macros: testMacros

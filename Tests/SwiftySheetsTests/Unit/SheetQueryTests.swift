@@ -362,7 +362,6 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(results[0].name, "Alice")  // 80k
         XCTAssertEqual(results[1].name, "David")  // 70k
     }
-}
 
     func testQueryOrSemantics() async throws {
         setupMockSpreadsheet()
@@ -442,6 +441,7 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         let all = try await query.execute()
         XCTAssertEqual(all.count, 3)
     }
+}
 
 @SheetRow
 private struct Employee: Sendable {

@@ -107,11 +107,11 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
         // Generate static formatter declarations
         var staticFormatters = ""
         if needsISO8601 {
-            staticFormatters += "private static let _iso8601Formatter = ISO8601DateFormatter()\n"
+            staticFormatters += "private nonisolated(unsafe) static let _iso8601Formatter = ISO8601DateFormatter()\n"
         }
         for (i, format) in dateFormats.sorted().enumerated() {
             staticFormatters += """
-            private static let _dateFormatter\(i): DateFormatter = {
+            private nonisolated(unsafe) static let _dateFormatter\(i): DateFormatter = {
                 let f = DateFormatter()
                 f.dateFormat = "\(format)"
                 return f

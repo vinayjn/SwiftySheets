@@ -1,6 +1,6 @@
 // Public Macro Declarations
 
-@attached(member, names: named(init), named(encodeRow))
+@attached(member, names: named(init), named(encodeRow), arbitrary)
 @attached(extension, conformances: SheetRowCodable, Equatable, Hashable)
 public macro SheetRow() = #externalMacro(module: "SwiftySheetsMacros", type: "SheetRowMacro")
 
