@@ -8,7 +8,7 @@ public struct SheetColumn: Sendable, ExpressibleByStringLiteral, CustomStringCon
     /// Creates a column from a string. Throws if invalid.
     public init(_ value: String) throws {
         let v = value.uppercased()
-        guard v.range(of: "^[A-Z]+$", options: .regularExpression) != nil else {
+        guard !v.isEmpty, v.allSatisfy({ $0 >= "A" && $0 <= "Z" }) else {
             throw SheetsError.invalidRange(message: "Invalid column letter: '\(value)'. Columns must be letters (A, B, AA...).")
         }
         self.value = v

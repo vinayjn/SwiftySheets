@@ -30,7 +30,8 @@ public struct SheetRange: Sendable, CustomStringConvertible {
         
         var rangePart = value
         if parts.count == 2 {
-            self.sheetName = parts[0]
+            // Strip surrounding single-quotes from sheet names (e.g. 'My Sheet' → My Sheet)
+            self.sheetName = parts[0].trimmingCharacters(in: CharacterSet(charactersIn: "'"))
             rangePart = parts[1]
         } else {
             self.sheetName = nil
