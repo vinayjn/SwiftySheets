@@ -441,6 +441,91 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         let all = try await query.execute()
         XCTAssertEqual(all.count, 3)
     }
+
+    // MARK: - Value-Type Semantics Tests
+
+    func testQueryValueTypeCopyIndependence() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+
+        mockValues([
+            ["Alice", "Engineering", "60000", "Active"],
+            ["Bob", "Marketing", "55000", "Inactive"],
+            ["Charlie", "Engineering", "50000", "Active"]
+        ])
+
+        let baseQuery = spreadsheet.query(Employee.self, in: #Range("A:D"))
+        let filtered = baseQuery.where(\.department, equals: "Engineering")
+
+        // Base query should be unaffected by the derived query
+        let allResults = try await baseQuery.execute()
+        XCTAssertEqual(allResults.count, 3, "Base query should return all rows")
+
+        // Re-queue for filtered query
+        mockValues([
+            ["Alice", "Engineering", "60000", "Active"],
+            ["Bob", "Marketing", "55000", "Inactive"],
+            ["Charlie", "Engineering", "50000", "Active"]
+        ])
+
+        let filteredResults = try await filtered.execute()
+        XCTAssertEqual(filteredResults.count, 2, "Filtered query should only return Engineering rows")
+    }
+
+    func testQuerySortCopyIndependence() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+
+        mockValues([
+            ["Charlie", "Dept", "1", "Active"],
+            ["Alice", "Dept", "2", "Active"],
+            ["Bob", "Dept", "3", "Active"]
+        ])
+
+        let baseQuery = spreadsheet.query(Employee.self, in: #Range("A:D"))
+        let _ = baseQuery.sorted(by: \.name)
+
+        // Base query should preserve insertion order (not sorted)
+        let results = try await baseQuery.execute()
+        XCTAssertEqual(results[0].name, "Charlie")
+        XCTAssertEqual(results[1].name, "Alice")
+        XCTAssertEqual(results[2].name, "Bob")
+    }
+
+    func testQueryLimitCopyIndependence() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+
+        mockValues([
+            ["A", "Dept", "1", "Active"],
+            ["B", "Dept", "2", "Active"],
+            ["C", "Dept", "3", "Active"]
+        ])
+
+        let baseQuery = spreadsheet.query(Employee.self, in: #Range("A:D"))
+        let _ = baseQuery.limit(1)
+
+        // Base query should return all rows, not limited
+        let results = try await baseQuery.execute()
+        XCTAssertEqual(results.count, 3)
+    }
+
+    func testQueryOrCopyIndependence() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+
+        mockValues([
+            ["Alice", "Engineering", "60000", "Active"],
+            ["Bob", "Marketing", "55000", "Inactive"]
+        ])
+
+        let baseQuery = spreadsheet.query(Employee.self, in: #Range("A:D"))
+        let _ = baseQuery.or { $0.where(\.department, equals: "Engineering") }
+
+        // Base query has no OR branches, so all rows pass
+        let results = try await baseQuery.execute()
+        XCTAssertEqual(results.count, 2)
+    }
 }
 
 @SheetRow

@@ -9,7 +9,9 @@ private struct KeyedFilter<T: Sendable>: Sendable {
 // MARK: - Query Builder
 
 /// A fluent query builder for fetching and filtering typed rows.
-/// Uses mutable state internally for efficiency, executes on fetch().
+/// Uses copy-on-return semantics for full value-type safety and `Sendable` conformance
+/// with no data races. All builder methods return a modified copy, leaving the original
+/// query unchanged.
 /// - Typed `.where()` methods are idempotent (duplicates ignored)
 /// - Custom `.filter()` closures always add
 /// - Sort operations chain correctly
@@ -19,15 +21,15 @@ private struct KeyedFilter<T: Sendable>: Sendable {
 ///     .sorted(by: \.name)
 ///     .execute()
 /// ```
-public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Sendable {
+public struct SheetQuery<T: SheetRowDecodable & Sendable>: Sendable {
     private let spreadsheet: Spreadsheet
     private let range: SheetRange
     private let valueRenderOption: ValueRenderOption
     private let dateTimeRenderOption: DateRenderOption
 
-    // Mutable state - accumulated during chaining
+    // Accumulated state — copied on every builder call
     private var filters: [KeyedFilter<T>] = []
-    private var filterKeys: Set<String> = []  // Track added filter keys
+    private var filterKeys: Set<String> = []  // Track added filter keys for deduplication
     private var orBranches: [[@Sendable (T) -> Bool]] = []
     private var sortComparators: [@Sendable (T, T) -> Bool] = []
     private var _limitCount: Int?
@@ -47,15 +49,15 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
 
     // MARK: - Internal Filter Helpers
 
-    /// Add a keyed filter (for deduplication)
-    private func addFilter(key: String, predicate: @escaping @Sendable (T) -> Bool) {
-        guard !filterKeys.contains(key) else { return }  // Ignore duplicates
+    /// Add a keyed filter (for deduplication). Silently ignores duplicate keys.
+    private mutating func addFilter(key: String, predicate: @escaping @Sendable (T) -> Bool) {
+        guard !filterKeys.contains(key) else { return }
         filterKeys.insert(key)
         filters.append(KeyedFilter(key: key, predicate: predicate))
     }
 
-    /// Add a custom filter (no deduplication)
-    private func addCustomFilter(predicate: @escaping @Sendable (T) -> Bool) {
+    /// Add a custom filter (no deduplication).
+    private mutating func addCustomFilter(predicate: @escaping @Sendable (T) -> Bool) {
         filters.append(KeyedFilter(key: nil, predicate: predicate))
     }
 
@@ -66,147 +68,134 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
     /// ```swift
     /// .filter { $0.salary > 50000 }
     /// ```
-    @discardableResult
     public func filter(_ predicate: @escaping @Sendable (T) -> Bool) -> SheetQuery<T> {
-        addCustomFilter(predicate: predicate)
-        return self
+        var copy = self
+        copy.addCustomFilter(predicate: predicate)
+        return copy
     }
 
     /// Filter rows where a property equals a value.
     /// ```swift
     /// .where(\.department, equals: "Engineering")
     /// ```
-    @discardableResult
     public func `where`<V: Equatable & Sendable>(_ keyPath: KeyPath<T, V> & Sendable, equals value: V) -> SheetQuery<T> {
-        let key = "equals:\(keyPath):\(value)"
-        addFilter(key: key) { $0[keyPath: keyPath] == value }
-        return self
+        var copy = self
+        copy.addFilter(key: "equals:\(keyPath):\(value)") { $0[keyPath: keyPath] == value }
+        return copy
     }
 
     /// Filter rows where a property does not equal a value.
     /// ```swift
     /// .where(\.status, notEquals: "Deleted")
     /// ```
-    @discardableResult
     public func `where`<V: Equatable & Sendable>(_ keyPath: KeyPath<T, V> & Sendable, notEquals value: V) -> SheetQuery<T> {
-        let key = "notEquals:\(keyPath):\(value)"
-        addFilter(key: key) { $0[keyPath: keyPath] != value }
-        return self
+        var copy = self
+        copy.addFilter(key: "notEquals:\(keyPath):\(value)") { $0[keyPath: keyPath] != value }
+        return copy
     }
 
     /// Filter rows where a property is in a set of values.
     /// ```swift
     /// .where(\.status, isIn: ["Active", "Pending"])
     /// ```
-    @discardableResult
     public func `where`<V: Equatable & Sendable>(_ keyPath: KeyPath<T, V> & Sendable, isIn values: Set<V>) -> SheetQuery<T> {
-        let key = "isIn:\(keyPath):\(values.hashValue)"
-        addFilter(key: key) { values.contains($0[keyPath: keyPath]) }
-        return self
+        var copy = self
+        copy.addFilter(key: "isIn:\(keyPath):\(values.hashValue)") { values.contains($0[keyPath: keyPath]) }
+        return copy
     }
 
     /// Filter rows where a comparable property is greater than a value.
     /// ```swift
     /// .where(\.salary, greaterThan: 50000)
     /// ```
-    @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V> & Sendable, greaterThan value: V) -> SheetQuery<T> {
-        let key = "greaterThan:\(keyPath):\(value)"
-        addFilter(key: key) { $0[keyPath: keyPath] > value }
-        return self
+        var copy = self
+        copy.addFilter(key: "greaterThan:\(keyPath):\(value)") { $0[keyPath: keyPath] > value }
+        return copy
     }
 
     /// Filter rows where a comparable property is less than a value.
-    @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V> & Sendable, lessThan value: V) -> SheetQuery<T> {
-        let key = "lessThan:\(keyPath):\(value)"
-        addFilter(key: key) { $0[keyPath: keyPath] < value }
-        return self
+        var copy = self
+        copy.addFilter(key: "lessThan:\(keyPath):\(value)") { $0[keyPath: keyPath] < value }
+        return copy
     }
 
     /// Filter rows where a comparable property is greater than or equal to a value.
     /// ```swift
     /// .where(\.age, greaterThanOrEquals: 18)
     /// ```
-    @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V> & Sendable, greaterThanOrEquals value: V) -> SheetQuery<T> {
-        let key = "greaterThanOrEquals:\(keyPath):\(value)"
-        addFilter(key: key) { $0[keyPath: keyPath] >= value }
-        return self
+        var copy = self
+        copy.addFilter(key: "greaterThanOrEquals:\(keyPath):\(value)") { $0[keyPath: keyPath] >= value }
+        return copy
     }
 
     /// Filter rows where a comparable property is less than or equal to a value.
-    @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V> & Sendable, lessThanOrEquals value: V) -> SheetQuery<T> {
-        let key = "lessThanOrEquals:\(keyPath):\(value)"
-        addFilter(key: key) { $0[keyPath: keyPath] <= value }
-        return self
+        var copy = self
+        copy.addFilter(key: "lessThanOrEquals:\(keyPath):\(value)") { $0[keyPath: keyPath] <= value }
+        return copy
     }
 
     /// Filter rows where a comparable property is between two values (inclusive).
     /// ```swift
     /// .where(\.score, between: 50...100)
     /// ```
-    @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V> & Sendable, between range: ClosedRange<V>) -> SheetQuery<T> {
-        let key = "between:\(keyPath):\(range)"
-        addFilter(key: key) { range.contains($0[keyPath: keyPath]) }
-        return self
+        var copy = self
+        copy.addFilter(key: "between:\(keyPath):\(range)") { range.contains($0[keyPath: keyPath]) }
+        return copy
     }
 
     /// Filter rows where a string property contains a substring.
     /// ```swift
     /// .where(\.name, contains: "Smith")
     /// ```
-    @discardableResult
     public func `where`(_ keyPath: KeyPath<T, String> & Sendable, contains substring: String) -> SheetQuery<T> {
-        let key = "contains:\(keyPath):\(substring)"
-        addFilter(key: key) { $0[keyPath: keyPath].contains(substring) }
-        return self
+        var copy = self
+        copy.addFilter(key: "contains:\(keyPath):\(substring)") { $0[keyPath: keyPath].contains(substring) }
+        return copy
     }
 
     /// Filter rows where a string property starts with a prefix.
     /// ```swift
     /// .where(\.email, startsWith: "admin")
     /// ```
-    @discardableResult
     public func `where`(_ keyPath: KeyPath<T, String> & Sendable, startsWith prefix: String) -> SheetQuery<T> {
-        let key = "startsWith:\(keyPath):\(prefix)"
-        addFilter(key: key) { $0[keyPath: keyPath].hasPrefix(prefix) }
-        return self
+        var copy = self
+        copy.addFilter(key: "startsWith:\(keyPath):\(prefix)") { $0[keyPath: keyPath].hasPrefix(prefix) }
+        return copy
     }
 
     /// Filter rows where a string property ends with a suffix.
     /// ```swift
     /// .where(\.email, endsWith: "@company.com")
     /// ```
-    @discardableResult
     public func `where`(_ keyPath: KeyPath<T, String> & Sendable, endsWith suffix: String) -> SheetQuery<T> {
-        let key = "endsWith:\(keyPath):\(suffix)"
-        addFilter(key: key) { $0[keyPath: keyPath].hasSuffix(suffix) }
-        return self
+        var copy = self
+        copy.addFilter(key: "endsWith:\(keyPath):\(suffix)") { $0[keyPath: keyPath].hasSuffix(suffix) }
+        return copy
     }
 
     /// Filter rows where an optional property is nil.
     /// ```swift
     /// .whereNil(\.nickname)
     /// ```
-    @discardableResult
     public func whereNil<V: Sendable>(_ keyPath: KeyPath<T, V?> & Sendable) -> SheetQuery<T> {
-        let key = "isNil:\(keyPath)"
-        addFilter(key: key) { $0[keyPath: keyPath] == nil }
-        return self
+        var copy = self
+        copy.addFilter(key: "isNil:\(keyPath)") { $0[keyPath: keyPath] == nil }
+        return copy
     }
 
     /// Filter rows where an optional property is not nil.
     /// ```swift
     /// .whereNotNil(\.nickname)
     /// ```
-    @discardableResult
     public func whereNotNil<V: Sendable>(_ keyPath: KeyPath<T, V?> & Sendable) -> SheetQuery<T> {
-        let key = "isNotNil:\(keyPath)"
-        addFilter(key: key) { $0[keyPath: keyPath] != nil }
-        return self
+        var copy = self
+        copy.addFilter(key: "isNotNil:\(keyPath)") { $0[keyPath: keyPath] != nil }
+        return copy
     }
 
     /// Add an OR branch to the query. An item passes if it matches the AND filters
@@ -218,9 +207,8 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
     /// .or { $0.where(\.status, equals: "Active") }
     /// .or { $0.where(\.status, equals: "Pending") }
     /// ```
-    @discardableResult
-    public func or(_ builder: (SheetQuery<T>) -> SheetQuery<T>) -> SheetQuery<T> {
-        // Create a fresh query to capture the OR branch predicates
+    public func or(_ builder: @Sendable (SheetQuery<T>) -> SheetQuery<T>) -> SheetQuery<T> {
+        // Create a fresh query to capture only the OR branch predicates
         let freshQuery = SheetQuery<T>(
             spreadsheet: spreadsheet,
             range: range,
@@ -228,13 +216,13 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
             dateTimeRenderOption: dateTimeRenderOption
         )
         let orQuery = builder(freshQuery)
-
-        // Collect the predicates from the OR branch
         let branchPredicates = orQuery.filters.map { $0.predicate }
+
+        var copy = self
         if !branchPredicates.isEmpty {
-            orBranches.append(branchPredicates)
+            copy.orBranches.append(branchPredicates)
         }
-        return self
+        return copy
     }
 
     // MARK: - Sort
@@ -245,15 +233,15 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
     /// .sorted(by: \.department)
     /// .sorted(by: \.name)  // secondary sort
     /// ```
-    @discardableResult
     public func sorted<V: Comparable & Sendable>(by keyPath: KeyPath<T, V> & Sendable, ascending: Bool = true) -> SheetQuery<T> {
         let comparator: @Sendable (T, T) -> Bool = { lhs, rhs in
             let l = lhs[keyPath: keyPath]
             let r = rhs[keyPath: keyPath]
             return ascending ? l < r : l > r
         }
-        sortComparators.append(comparator)
-        return self
+        var copy = self
+        copy.sortComparators.append(comparator)
+        return copy
     }
 
     // MARK: - Pagination
@@ -262,20 +250,20 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
     /// ```swift
     /// .limit(10)
     /// ```
-    @discardableResult
     public func limit(_ count: Int) -> SheetQuery<T> {
-        _limitCount = count
-        return self
+        var copy = self
+        copy._limitCount = count
+        return copy
     }
 
     /// Skip a number of rows (for pagination).
     /// ```swift
     /// .offset(20).limit(10)  // Page 3
     /// ```
-    @discardableResult
     public func offset(_ count: Int) -> SheetQuery<T> {
-        _offsetCount = count
-        return self
+        var copy = self
+        copy._offsetCount = count
+        return copy
     }
 
     // MARK: - Execute
@@ -332,8 +320,12 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
     }
 
     /// Fetch the first row matching the query.
+    /// Creates an internal copy with `limit(1)` before executing so that the
+    /// caller's query is not mutated and sorting/filtering can stop early.
     public func first() async throws(SheetsError) -> T? {
-        try await execute().first
+        var limited = self
+        limited._limitCount = 1
+        return try await limited.execute().first
     }
 
     /// Count rows matching the query.
