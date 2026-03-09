@@ -126,11 +126,15 @@ public final class DriveListBuilder: @unchecked Sendable {
     }
     
     /// Return the first matching file.
+    /// Note: This fetches all matching files and returns the first one.
+    /// There is no server-side limit optimization.
     public func first() async throws(SheetsError) -> DriveFile? {
         try await execute().first
     }
-    
+
     /// Return the count of matching files.
+    /// Note: This fetches all matching files and counts them client-side.
+    /// There is no server-side count optimization.
     public func count() async throws(SheetsError) -> Int {
         try await execute().count
     }

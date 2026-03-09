@@ -74,20 +74,27 @@ public struct SortRange: BatchRequestConvertible {
 }
 
 public struct ResizeSheet: BatchRequestConvertible {
-    let sheet: Sheet
+    let sheetId: Int
     let rows: Int
     let columns: Int
-    
-    public init(sheet: Sheet, rows: Int, columns: Int) {
-        self.sheet = sheet
+
+    public init(sheetId: Int, rows: Int, columns: Int) {
+        self.sheetId = sheetId
         self.rows = rows
         self.columns = columns
     }
-    
+
+    /// Convenience init accepting a Sheet object.
+    public init(sheet: Sheet, rows: Int, columns: Int) {
+        self.sheetId = sheet.sheetId
+        self.rows = rows
+        self.columns = columns
+    }
+
     public var request: BatchUpdateRequest.Request {
         let gridProps = Sheet.GridProperties(rowCount: rows, columnCount: columns)
         let props = Sheet.SheetProperties(
-            sheetId: sheet.sheetId,
+            sheetId: sheetId,
             title: "",
             index: 0,
             gridProperties: gridProps
