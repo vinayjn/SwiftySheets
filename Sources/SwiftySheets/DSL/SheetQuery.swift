@@ -29,15 +29,15 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
     private let range: SheetRange
     private let valueRenderOption: ValueRenderOption
     private let dateTimeRenderOption: DateRenderOption
-    
+
     // Mutable state - accumulated during chaining
     private var filters: [KeyedFilter<T>] = []
     private var filterKeys: Set<String> = []  // Track added filter keys
-    private var orPredicates: [@Sendable (T) -> Bool] = []
+    private var orBranches: [[@Sendable (T) -> Bool]] = []
     private var sortComparators: [@Sendable (T, T) -> Bool] = []
     private var _limitCount: Int?
     private var _offsetCount: Int?
-    
+
     init(
         spreadsheet: Spreadsheet,
         range: SheetRange,
@@ -49,23 +49,23 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         self.valueRenderOption = valueRenderOption
         self.dateTimeRenderOption = dateTimeRenderOption
     }
-    
+
     // MARK: - Internal Filter Helpers
-    
+
     /// Add a keyed filter (for deduplication)
     private func addFilter(key: String, predicate: @escaping @Sendable (T) -> Bool) {
         guard !filterKeys.contains(key) else { return }  // Ignore duplicates
         filterKeys.insert(key)
         filters.append(KeyedFilter(key: key, predicate: predicate))
     }
-    
+
     /// Add a custom filter (no deduplication)
     private func addCustomFilter(predicate: @escaping @Sendable (T) -> Bool) {
         filters.append(KeyedFilter(key: nil, predicate: predicate))
     }
-    
+
     // MARK: - Filter
-    
+
     /// Filter rows using a predicate closure.
     /// Note: Custom filters are always added (no deduplication possible).
     /// ```swift
@@ -76,7 +76,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addCustomFilter(predicate: predicate)
         return self
     }
-    
+
     /// Filter rows where a property equals a value.
     /// ```swift
     /// .where(\.department, equals: "Engineering")
@@ -88,7 +88,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value] == value }
         return self
     }
-    
+
     /// Filter rows where a property does not equal a value.
     /// ```swift
     /// .where(\.status, notEquals: "Deleted")
@@ -100,7 +100,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value] != value }
         return self
     }
-    
+
     /// Filter rows where a property is in a set of values.
     /// ```swift
     /// .where(\.status, isIn: ["Active", "Pending"])
@@ -112,7 +112,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { values.contains($0[keyPath: safeKeyPath.value]) }
         return self
     }
-    
+
     /// Filter rows where a comparable property is greater than a value.
     /// ```swift
     /// .where(\.salary, greaterThan: 50000)
@@ -124,7 +124,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value] > value }
         return self
     }
-    
+
     /// Filter rows where a comparable property is less than a value.
     @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V>, lessThan value: V) -> SheetQuery<T> {
@@ -133,7 +133,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value] < value }
         return self
     }
-    
+
     /// Filter rows where a comparable property is greater than or equal to a value.
     /// ```swift
     /// .where(\.age, greaterThanOrEquals: 18)
@@ -145,7 +145,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value] >= value }
         return self
     }
-    
+
     /// Filter rows where a comparable property is less than or equal to a value.
     @discardableResult
     public func `where`<V: Comparable & Sendable>(_ keyPath: KeyPath<T, V>, lessThanOrEquals value: V) -> SheetQuery<T> {
@@ -154,7 +154,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value] <= value }
         return self
     }
-    
+
     /// Filter rows where a comparable property is between two values (inclusive).
     /// ```swift
     /// .where(\.score, between: 50...100)
@@ -166,7 +166,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { range.contains($0[keyPath: safeKeyPath.value]) }
         return self
     }
-    
+
     /// Filter rows where a string property contains a substring.
     /// ```swift
     /// .where(\.name, contains: "Smith")
@@ -178,7 +178,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value].contains(substring) }
         return self
     }
-    
+
     /// Filter rows where a string property starts with a prefix.
     /// ```swift
     /// .where(\.email, startsWith: "admin")
@@ -190,7 +190,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value].hasPrefix(prefix) }
         return self
     }
-    
+
     /// Filter rows where a string property ends with a suffix.
     /// ```swift
     /// .where(\.email, endsWith: "@company.com")
@@ -202,7 +202,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value].hasSuffix(suffix) }
         return self
     }
-    
+
     /// Filter rows where an optional property is nil.
     /// ```swift
     /// .whereNil(\.nickname)
@@ -214,7 +214,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value] == nil }
         return self
     }
-    
+
     /// Filter rows where an optional property is not nil.
     /// ```swift
     /// .whereNotNil(\.nickname)
@@ -226,10 +226,15 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         addFilter(key: key) { $0[keyPath: safeKeyPath.value] != nil }
         return self
     }
-    
-    /// Add an OR condition to the query.
+
+    /// Add an OR branch to the query. An item passes if it matches the AND filters
+    /// AND at least one OR branch. Within an OR branch, multiple conditions are AND'd together.
+    ///
+    /// Example: items where `dept == "Eng"` AND (`status == "Active"` OR `status == "Pending"`):
     /// ```swift
+    /// .where(\.dept, equals: "Eng")
     /// .or { $0.where(\.status, equals: "Active") }
+    /// .or { $0.where(\.status, equals: "Pending") }
     /// ```
     @discardableResult
     public func or(_ builder: (SheetQuery<T>) -> SheetQuery<T>) -> SheetQuery<T> {
@@ -241,24 +246,22 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
             dateTimeRenderOption: dateTimeRenderOption
         )
         let orQuery = builder(freshQuery)
-        
-        // Combine the OR branch filters into one predicate
-        let orBranchFilters = orQuery.filters
-        if !orBranchFilters.isEmpty {
-            let combinedOrPredicate: @Sendable (T) -> Bool = { item in
-                orBranchFilters.allSatisfy { $0.predicate(item) }
-            }
-            orPredicates.append(combinedOrPredicate)
+
+        // Collect the predicates from the OR branch
+        let branchPredicates = orQuery.filters.map { $0.predicate }
+        if !branchPredicates.isEmpty {
+            orBranches.append(branchPredicates)
         }
         return self
     }
-    
+
     // MARK: - Sort
-    
+
     /// Sort rows by a comparable property.
+    /// Multiple calls chain as primary, secondary, etc. sort keys.
     /// ```swift
-    /// .sorted(by: \.name)
-    /// .sorted(by: \.salary, ascending: false)
+    /// .sorted(by: \.department)
+    /// .sorted(by: \.name)  // secondary sort
     /// ```
     @discardableResult
     public func sorted<V: Comparable & Sendable>(by keyPath: KeyPath<T, V>, ascending: Bool = true) -> SheetQuery<T> {
@@ -271,19 +274,9 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         sortComparators.append(comparator)
         return self
     }
-    
-    /// Add a secondary sort after the primary sort.
-    /// ```swift
-    /// .sorted(by: \.department).thenSorted(by: \.name)
-    /// ```
-    @discardableResult
-    public func thenSorted<V: Comparable & Sendable>(by keyPath: KeyPath<T, V>, ascending: Bool = true) -> SheetQuery<T> {
-        // thenSorted just adds another comparator to the chain
-        return sorted(by: keyPath, ascending: ascending)
-    }
-    
+
     // MARK: - Pagination
-    
+
     /// Limit the number of results.
     /// ```swift
     /// .limit(10)
@@ -293,7 +286,7 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         _limitCount = count
         return self
     }
-    
+
     /// Skip a number of rows (for pagination).
     /// ```swift
     /// .offset(20).limit(10)  // Page 3
@@ -303,9 +296,9 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
         _offsetCount = count
         return self
     }
-    
+
     // MARK: - Execute
-    
+
     /// Execute the query and fetch all matching rows.
     public func execute() async throws(SheetsError) -> [T] {
         // Get all typed values
@@ -315,22 +308,24 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
             valueRenderOption: valueRenderOption,
             dateTimeRenderOption: dateTimeRenderOption
         )
-        
+
         // Apply AND filters
         if !filters.isEmpty {
             results = results.filter { item in
                 filters.allSatisfy { $0.predicate(item) }
             }
         }
-        
-        // Apply OR predicates (any OR branch passes)
-        if !orPredicates.isEmpty {
+
+        // Apply OR branches: item must pass at least one OR branch
+        // (each branch is a set of AND'd predicates)
+        if !orBranches.isEmpty {
             results = results.filter { item in
-                // Item passes if it passes AND filters OR any OR branch
-                orPredicates.contains { $0(item) }
+                orBranches.contains { branch in
+                    branch.allSatisfy { predicate in predicate(item) }
+                }
             }
         }
-        
+
         // Apply sort (chain of comparators)
         if !sortComparators.isEmpty {
             results.sort { lhs, rhs in
@@ -341,28 +336,27 @@ public final class SheetQuery<T: SheetRowDecodable & Sendable>: @unchecked Senda
                 return false // Equal
             }
         }
-        
+
         // Apply offset
         if let offset = _offsetCount {
             results = Array(results.dropFirst(offset))
         }
-        
+
         // Apply limit
         if let limit = _limitCount {
             results = Array(results.prefix(limit))
         }
-        
+
         return results
     }
-    
 
-    
+
+
     /// Fetch the first row matching the query.
     public func first() async throws(SheetsError) -> T? {
-        _limitCount = 1
-        return try await execute().first
+        try await execute().first
     }
-    
+
     /// Count rows matching the query.
     public func count() async throws(SheetsError) -> Int {
         try await execute().count
