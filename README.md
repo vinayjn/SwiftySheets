@@ -137,6 +137,41 @@ let reports = try await client.drive.list()
 let newFile = try await client.drive.create(name: "New Budget")
 ```
 
+## 🔐 Error Handling
+
+SwiftySheets uses typed throws for precise error handling:
+
+```swift
+do throws(SheetsError) {
+    let users: [User] = try await spreadsheet.values(range: #Range("A:D"))
+} catch {
+    switch error {
+    case .authenticationFailed:
+        // Token expired or invalid
+    case .permissionDenied(let message):
+        // Share the sheet with your service account email
+    case .spreadsheetNotFound:
+        // Wrong spreadsheet ID
+    case .rateLimitExceeded(let retryAfter):
+        // Wait and retry
+    case .quotaExceeded(let retryAfter):
+        // Daily quota hit
+    case .decodingError(let context):
+        // Row decoding failed — includes row index and type name
+    case .networkError(let reason):
+        // Connection issue
+    case .invalidRequest:
+        // Malformed request
+    case .invalidResponse(let status):
+        // Unexpected API response
+    case .apiError(let details):
+        // Google API specific error
+    case .invalidRange(let message):
+        // Bad range format
+    }
+}
+```
+
 ## 🧪 Testing
 
 SwiftySheets includes a comprehensive test suite (Unit & Integration).
