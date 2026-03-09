@@ -276,23 +276,6 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
         return results
     }
 
-    private static func columnLetterToIndex(_ letter: String) throws -> Int {
-        guard !letter.isEmpty else {
-             throw MacroError(message: "Column name cannot be empty")
-        }
-        var column = 0
-        for char in letter.uppercased().unicodeScalars {
-            guard char.value >= 65 && char.value <= 90 else { // A-Z
-                throw MacroError(message: "Invalid column name '\(letter)'. use letters A-Z.")
-            }
-            column = column * 26 + (Int(char.value) - 64)
-        }
-        return column - 1
-    }
-}
-
-struct MacroError: Error {
-    let message: String
 }
 
 public struct ColumnMacro: PeerMacro {
