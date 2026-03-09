@@ -18,6 +18,8 @@ public enum SpreadsheetScope {
     public static let readwrite = "https://www.googleapis.com/auth/spreadsheets"
 }
 
+// @unchecked Sendable: ServiceAccountTokenProvider is not marked Sendable but is safe
+// to use from multiple contexts — it manages its own internal synchronization for token caching.
 public struct ServiceAccountCredentials: GoogleCredentials, @unchecked Sendable {
     private let credentials: ServiceAccountTokenProvider
 
@@ -43,10 +45,10 @@ public struct ServiceAccountCredentials: GoogleCredentials, @unchecked Sendable 
         return authenticatedRequest
     }
 
-
-
     private func getAccessToken() async throws -> String {
         try await withCheckedThrowingContinuation { continuation in
+            // withToken either throws (callback never called) or succeeds (callback called exactly once).
+            // The do/catch ensures the continuation is always resumed exactly once.
             do {
                 try credentials.withToken { token, error in
                     if let error {

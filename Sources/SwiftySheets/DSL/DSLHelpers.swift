@@ -93,6 +93,7 @@ public struct ResizeSheet: BatchRequestConvertible {
 
     public var request: BatchUpdateRequest.Request {
         let gridProps = Sheet.GridProperties(rowCount: rows, columnCount: columns)
+        // title and index are ignored by the API because fields mask is "gridProperties" only.
         let props = Sheet.SheetProperties(
             sheetId: sheetId,
             title: "",
