@@ -84,6 +84,67 @@ final class ErrorHandlingTests: XCTestCase, @unchecked Sendable {
         }
     }
     
+    func testDecodingErrorPreservesContext() async throws {
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        mockSession.mockResponse = mockResponse
+        // Send invalid JSON that can't decode to ValueRange
+        mockSession.mockData = Data("{\"invalid\": true}".utf8)
+
+        do {
+            let _: ValueRange = try await client.makeRequest(URLRequest(url: URL(string: "https://example.com")!))
+            XCTFail("Should have thrown decodingError")
+        } catch SheetsError.decodingError(let context) {
+            XCTAssertTrue(context.contains("ValueRange"), "Error context should mention the type: \(context)")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testDriveErrorHandling401() async throws {
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 401,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = Data()
+
+        do {
+            _ = try await client.drive.create(name: "Test")
+            XCTFail("Should have thrown authenticationFailed error")
+        } catch SheetsError.authenticationFailed {
+            // Expected - DriveClient now uses shared ResponseHandler
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testDriveErrorHandling429() async throws {
+        let mockResponse = HTTPURLResponse(
+            url: URL(string: "https://example.com")!,
+            statusCode: 429,
+            httpVersion: nil,
+            headerFields: ["Retry-After": "30"]
+        )
+        mockSession.mockResponse = mockResponse
+        mockSession.mockData = Data()
+
+        do {
+            _ = try await client.drive.create(name: "Test")
+            XCTFail("Should have thrown rateLimitExceeded error")
+        } catch SheetsError.rateLimitExceeded(let retryAfter) {
+            XCTAssertEqual(retryAfter, 30)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
     func testSuccessfulResponseCodes() async throws {
         let successCodes = [200, 201, 204, 299]
         

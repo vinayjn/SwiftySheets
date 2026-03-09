@@ -6,32 +6,33 @@ import FoundationNetworking
 public struct DriveClient: Sendable {
     private let transport: SheetsTransport
     private let baseURL = URL(string: "https://www.googleapis.com/drive/v3")!
-    
+
     init(transport: SheetsTransport) {
         self.transport = transport
     }
-    
+
     // MARK: - Read
-    
+
     internal func list(query: String? = nil) async throws(SheetsError) -> [DriveFile] {
         var url = baseURL.appendingPathComponent("files")
-        
+
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "fields", value: "files(id, name, mimeType)"),
             URLQueryItem(name: "pageSize", value: "1000")
         ]
-        
+
         if let query = query, !query.isEmpty {
             queryItems.append(URLQueryItem(name: "q", value: query))
         }
-        
+
         url.append(queryItems: queryItems)
-        
+
         let request = URLRequest(url: url)
-        let response: DriveFileList = try await validateAndDecode(sendRequest(request))
-        return response.files
+        let (data, response) = try await sendRequest(request)
+        let fileList: DriveFileList = try ResponseHandler.validateAndDecode(data: data, response: response)
+        return fileList.files
     }
-    
+
     /// Create a fluent query builder for listing Drive files.
     /// ```swift
     /// let reports = try await client.drive.list()
@@ -43,13 +44,13 @@ public struct DriveClient: Sendable {
     public func list() -> DriveListBuilder {
         DriveListBuilder(driveClient: self)
     }
-    
+
     // MARK: - Write
-    
+
     public enum FileType: Sendable {
         case spreadsheet
         case folder
-        
+
         var mimeType: String {
             switch self {
             case .spreadsheet: return "application/vnd.google-apps.spreadsheet"
@@ -57,69 +58,37 @@ public struct DriveClient: Sendable {
             }
         }
     }
-    
+
     public func create(name: String, type: FileType = .spreadsheet, parents: [String]? = nil) async throws(SheetsError) -> DriveFile {
         let url = baseURL.appendingPathComponent("files")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         let metadata = CreateFileRequest(name: name, mimeType: type.mimeType, parents: parents)
         guard let body = try? JSONEncoder().encode(metadata) else {
             throw .invalidRequest
         }
         request.httpBody = body
-        
-        return try await validateAndDecode(sendRequest(request))
+
+        let (data, response) = try await sendRequest(request)
+        return try ResponseHandler.validateAndDecode(data: data, response: response)
     }
-    
+
     public func delete(id: String) async throws(SheetsError) {
         let url = baseURL.appendingPathComponent("files").appendingPathComponent(id)
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
-        
-        try await validate(sendRequest(request))
+
+        let (data, response) = try await sendRequest(request)
+        try ResponseHandler.validate(data: data, response: response)
     }
-    
+
     private func sendRequest(_ request: URLRequest) async throws(SheetsError) -> (Data, URLResponse) {
         do {
             return try await transport.send(request)
         } catch {
             throw .networkError(error.localizedDescription)
-        }
-    }
-    
-    private func validateAndDecode<T: Decodable>(_ result: (Data, URLResponse)) throws(SheetsError) -> T {
-        let (data, response) = result
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw .invalidResponse(status: 500)
-        }
-        
-        guard (200...299).contains(httpResponse.statusCode) else {
-            if let apiError = try? JSONDecoder().decode(GoogleAPIError.self, from: data) {
-                throw .apiError(apiError)
-            }
-            throw .invalidResponse(status: httpResponse.statusCode)
-        }
-        
-        do {
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch {
-            throw .invalidResponse(status: httpResponse.statusCode)
-        }
-    }
-    
-    private func validate(_ result: (Data, URLResponse)) throws(SheetsError) {
-        let (data, response) = result
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw .invalidResponse(status: 500)
-        }
-        
-        guard (200...299).contains(httpResponse.statusCode) else {
-            if let apiError = try? JSONDecoder().decode(GoogleAPIError.self, from: data) {
-                throw .apiError(apiError)
-            }
-            throw .invalidResponse(status: httpResponse.statusCode)
         }
     }
 }

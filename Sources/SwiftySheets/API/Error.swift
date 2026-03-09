@@ -32,4 +32,5 @@ public enum SheetsError: Error, Sendable {
     case permissionDenied(message: String)
     case rateLimitExceeded(retryAfter: TimeInterval?)
     case invalidRange(message: String)
+    case decodingError(context: String)
 }
