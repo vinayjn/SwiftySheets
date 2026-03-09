@@ -34,6 +34,30 @@ final class SheetRangeTests: XCTestCase {
         XCTAssertEqual(range4.description, "Sheet3!AA10")
     }
     
+    func testQuotedSheetNameParsing() throws {
+        // Single-quoted sheet names (Google Sheets format for names with spaces)
+        let range = try SheetRange(parsing: "'My Sheet'!A1:B2")
+        XCTAssertEqual(range.sheetName, "My Sheet")
+        XCTAssertEqual(range.startColumn, "A")
+        XCTAssertEqual(range.startRow, 1)
+        XCTAssertEqual(range.endColumn, "B")
+        XCTAssertEqual(range.endRow, 2)
+    }
+
+    func testQuotedSheetNameWithSpecialChars() throws {
+        let range = try SheetRange(parsing: "'Q1 (2024)'!C3:D10")
+        XCTAssertEqual(range.sheetName, "Q1 (2024)")
+        XCTAssertEqual(range.startColumn, "C")
+        XCTAssertEqual(range.startRow, 3)
+        XCTAssertEqual(range.endColumn, "D")
+        XCTAssertEqual(range.endRow, 10)
+    }
+
+    func testUnquotedSheetNameUnchanged() throws {
+        let range = try SheetRange(parsing: "Sheet1!A1:B2")
+        XCTAssertEqual(range.sheetName, "Sheet1")
+    }
+
     func testInvalidRangeThrows() {
         // "ABC" is all letters, so it's treated as a column with no row
         XCTAssertNoThrow(try SheetRange(parsing: "ABC"))
