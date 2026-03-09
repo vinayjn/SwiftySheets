@@ -39,7 +39,9 @@ private struct SafeString: Decodable, Sendable {
     
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        if let stringValue = try? container.decode(String.self) {
+        if container.decodeNil() {
+            self.value = ""
+        } else if let stringValue = try? container.decode(String.self) {
             self.value = stringValue
         } else if let intValue = try? container.decode(Int.self) {
             self.value = String(intValue)

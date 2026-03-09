@@ -23,7 +23,7 @@ public enum SheetsError: Error, Sendable {
     case invalidResponse(status: Int)
     case authenticationFailed
     case invalidRequest
-    case networkError(String)  // Changed from Error to String for Sendable
+    case networkError(String)
     case invalidCredentials(message: String)
     case spreadsheetNotFound(message: String)
     case sheetNotFound(message: String)
@@ -33,4 +33,43 @@ public enum SheetsError: Error, Sendable {
     case rateLimitExceeded(retryAfter: TimeInterval?)
     case invalidRange(message: String)
     case decodingError(context: String)
+}
+
+extension SheetsError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .invalidResponse(let status):
+            return "Invalid API response (HTTP \(status))"
+        case .authenticationFailed:
+            return "Authentication failed — check your credentials"
+        case .invalidRequest:
+            return "The request could not be constructed"
+        case .networkError(let reason):
+            return "Network error: \(reason)"
+        case .invalidCredentials(let message):
+            return "Invalid credentials: \(message)"
+        case .spreadsheetNotFound(let message):
+            return "Spreadsheet not found: \(message)"
+        case .sheetNotFound(let message):
+            return "Sheet not found: \(message)"
+        case .apiError(let error):
+            return "Google API error \(error.error.code): \(error.error.message)"
+        case .quotaExceeded(let retryAfter):
+            if let seconds = retryAfter {
+                return "Quota exceeded — retry after \(Int(seconds))s"
+            }
+            return "Quota exceeded"
+        case .permissionDenied(let message):
+            return "Permission denied: \(message)"
+        case .rateLimitExceeded(let retryAfter):
+            if let seconds = retryAfter {
+                return "Rate limit exceeded — retry after \(Int(seconds))s"
+            }
+            return "Rate limit exceeded"
+        case .invalidRange(let message):
+            return "Invalid range: \(message)"
+        case .decodingError(let context):
+            return "Decoding error: \(context)"
+        }
+    }
 }
