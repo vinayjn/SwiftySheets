@@ -291,22 +291,22 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(results.count, 2)
     }
     
-    func testQueryThenSortedBy() async throws {
+    func testQuerySecondarySortedBy() async throws {
         setupMockSpreadsheet()
         let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
-        
+
         mockValues([
             ["Charlie", "Engineering", "50000", "Active"],
             ["Alice", "Engineering", "60000", "Active"],
             ["Bob", "Marketing", "55000", "Active"],
             ["David", "Engineering", "45000", "Active"]
         ])
-        
+
         let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
             .sorted(by: \.department)
-            .thenSorted(by: \.name)
+            .sorted(by: \.name)
             .execute()
-        
+
         // Engineering comes first (alphabetically), then Marketing
         // Within Engineering: Alice, Charlie, David (alphabetically)
         XCTAssertEqual(results[0].name, "Alice")
@@ -363,6 +363,85 @@ final class SheetQueryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(results[1].name, "David")  // 70k
     }
 }
+
+    func testQueryOrSemantics() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+
+        mockValues([
+            ["Alice", "Engineering", "60000", "Active"],
+            ["Bob", "Engineering", "55000", "Inactive"],
+            ["Charlie", "Marketing", "50000", "Active"],
+            ["David", "Sales", "70000", "Active"]
+        ])
+
+        // AND filter: department != "Sales"
+        // OR branches: status == "Active" OR department == "Engineering"
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .where(\.department, notEquals: "Sales")
+            .or { $0.where(\.status, equals: "Active") }
+            .or { $0.where(\.department, equals: "Engineering") }
+            .execute()
+
+        // After AND filter: Alice, Bob, Charlie (David excluded - Sales)
+        // OR branches: Active passes Alice+Charlie, Engineering passes Alice+Bob
+        // Union: Alice, Bob, Charlie
+        XCTAssertEqual(results.count, 3)
+        XCTAssertTrue(results.contains { $0.name == "Alice" })
+        XCTAssertTrue(results.contains { $0.name == "Bob" })
+        XCTAssertTrue(results.contains { $0.name == "Charlie" })
+    }
+
+    func testQueryOrWithMultipleConditionsInBranch() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+
+        mockValues([
+            ["Alice", "Engineering", "60000", "Active"],
+            ["Bob", "Engineering", "55000", "Inactive"],
+            ["Charlie", "Marketing", "50000", "Active"],
+            ["David", "Sales", "70000", "Active"]
+        ])
+
+        // OR branch with multiple conditions (AND'd within the branch):
+        // (department == "Engineering" AND status == "Active") OR (department == "Sales")
+        let results = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
+            .or { $0.where(\.department, equals: "Engineering").where(\.status, equals: "Active") }
+            .or { $0.where(\.department, equals: "Sales") }
+            .execute()
+
+        // Branch 1 matches Alice (Engineering + Active), Branch 2 matches David (Sales)
+        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(results.contains { $0.name == "Alice" })
+        XCTAssertTrue(results.contains { $0.name == "David" })
+    }
+
+    func testQueryFirstDoesNotMutateQuery() async throws {
+        setupMockSpreadsheet()
+        let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
+
+        mockValues([
+            ["A", "Dept", "1", "Active"],
+            ["B", "Dept", "2", "Active"],
+            ["C", "Dept", "3", "Active"]
+        ])
+
+        let query = spreadsheet.query(Employee.self, in: #Range("A:D"))
+
+        let first = try await query.first()
+        XCTAssertEqual(first?.name, "A")
+
+        // Re-queue response for second query execution
+        mockValues([
+            ["A", "Dept", "1", "Active"],
+            ["B", "Dept", "2", "Active"],
+            ["C", "Dept", "3", "Active"]
+        ])
+
+        // execute() on the same query should return all results, not just 1
+        let all = try await query.execute()
+        XCTAssertEqual(all.count, 3)
+    }
 
 @SheetRow
 private struct Employee: Sendable {
