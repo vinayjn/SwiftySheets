@@ -3,21 +3,20 @@ import Foundation
 import FoundationNetworking
 #endif
 
-final class SheetsTransport: Transport, Sendable {
+final class SheetsTransport: Sendable {
     private let credentials: GoogleCredentials
     private let session: URLSessionProtocol
-    
-    public init(
+
+    init(
         credentials: GoogleCredentials,
         session: URLSessionProtocol = URLSession.shared
     ) {
         self.credentials = credentials
         self.session = session
     }
-    
-    public func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        var authenticatedRequest = request
-        authenticatedRequest = try await credentials.authenticate(request)
+
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let authenticatedRequest = try await credentials.authenticate(request)
         return try await session.data(for: authenticatedRequest, delegate: nil)
     }
 }
