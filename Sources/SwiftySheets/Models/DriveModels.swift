@@ -14,8 +14,12 @@ public struct DriveFile: Codable, Sendable {
 
 public struct DriveFileList: Codable, Sendable {
     public let files: [DriveFile]
-    
-    public init(files: [DriveFile]) {
+    /// The token for retrieving the next page of results.
+    /// `nil` when this response is the final page.
+    public let nextPageToken: String?
+
+    public init(files: [DriveFile], nextPageToken: String? = nil) {
         self.files = files
+        self.nextPageToken = nextPageToken
     }
 }

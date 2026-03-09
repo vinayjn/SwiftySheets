@@ -13,24 +13,37 @@ public struct DriveClient: Sendable {
 
     // MARK: - Read
 
-    internal func list(query: String? = nil) async throws(SheetsError) -> [DriveFile] {
-        var url = baseURL.appendingPathComponent("files")
+    internal func list(query: String? = nil, pageSize: Int? = nil) async throws(SheetsError) -> [DriveFile] {
+        let resolvedPageSize = pageSize ?? 1000
+        var allFiles: [DriveFile] = []
+        var pageToken: String? = nil
 
-        var queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "fields", value: "files(id, name, mimeType)"),
-            URLQueryItem(name: "pageSize", value: "1000")
-        ]
+        repeat {
+            var baseQueryItems: [URLQueryItem] = [
+                URLQueryItem(name: "fields", value: "nextPageToken,files(id,name,mimeType)"),
+                URLQueryItem(name: "pageSize", value: String(resolvedPageSize))
+            ]
 
-        if let query = query, !query.isEmpty {
-            queryItems.append(URLQueryItem(name: "q", value: query))
-        }
+            if let query = query, !query.isEmpty {
+                baseQueryItems.append(URLQueryItem(name: "q", value: query))
+            }
 
-        url.append(queryItems: queryItems)
+            if let token = pageToken {
+                baseQueryItems.append(URLQueryItem(name: "pageToken", value: token))
+            }
 
-        let request = URLRequest(url: url)
-        let (data, response) = try await sendRequest(request)
-        let fileList: DriveFileList = try ResponseHandler.validateAndDecode(data: data, response: response)
-        return fileList.files
+            var url = baseURL.appendingPathComponent("files")
+            url.append(queryItems: baseQueryItems)
+
+            let request = URLRequest(url: url)
+            let (data, response) = try await sendRequest(request)
+            let fileList: DriveFileList = try ResponseHandler.validateAndDecode(data: data, response: response)
+
+            allFiles.append(contentsOf: fileList.files)
+            pageToken = fileList.nextPageToken
+        } while pageToken != nil
+
+        return allFiles
     }
 
     /// Create a fluent query builder for listing Drive files.
