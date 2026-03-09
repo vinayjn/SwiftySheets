@@ -15,6 +15,10 @@ public struct DriveListBuilder: Sendable {
     // Use Set to prevent duplicate filters
     private var queryParts: Set<String> = []
 
+    /// When set, overrides the default page size used in each API request.
+    /// `first()` sets this to 1 internally to avoid fetching unnecessary results.
+    private var _pageSize: Int?
+
     init(driveClient: DriveClient) {
         self.driveClient = driveClient
     }
@@ -106,14 +110,15 @@ public struct DriveListBuilder: Sendable {
 
     /// Execute the query and return matching files.
     public func execute() async throws(SheetsError) -> [DriveFile] {
-        try await driveClient.list(query: buildQuery())
+        try await driveClient.list(query: buildQuery(), pageSize: _pageSize)
     }
 
     /// Return the first matching file.
-    /// Note: This fetches all matching files and returns the first one.
-    /// There is no server-side limit optimization.
+    /// Sets `pageSize` to 1 so only a single file is fetched from the API.
     public func first() async throws(SheetsError) -> DriveFile? {
-        try await execute().first
+        var copy = self
+        copy._pageSize = 1
+        return try await copy.execute().first
     }
 
     /// Return the count of matching files.
