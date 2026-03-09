@@ -9,122 +9,106 @@ import Foundation
 ///     .nameContains("Report")
 ///     .execute()
 /// ```
-public final class DriveListBuilder: @unchecked Sendable {
+public struct DriveListBuilder: Sendable {
     private let driveClient: DriveClient
-    
+
     // Use Set to prevent duplicate filters
     private var queryParts: Set<String> = []
-    
+
     init(driveClient: DriveClient) {
         self.driveClient = driveClient
     }
-    
+
+    private func adding(_ part: String) -> DriveListBuilder {
+        var copy = self
+        copy.queryParts.insert(part)
+        return copy
+    }
+
     // MARK: - File Type Filters
-    
+
     /// Filter to only spreadsheets.
-    @discardableResult
     public func spreadsheets() -> DriveListBuilder {
-        queryParts.insert("mimeType = '\(DriveClient.FileType.spreadsheet.mimeType)'")
-        return self
+        adding("mimeType = '\(DriveClient.FileType.spreadsheet.mimeType)'")
     }
-    
+
     /// Filter to only folders.
-    @discardableResult
     public func folders() -> DriveListBuilder {
-        queryParts.insert("mimeType = '\(DriveClient.FileType.folder.mimeType)'")
-        return self
+        adding("mimeType = '\(DriveClient.FileType.folder.mimeType)'")
     }
-    
+
     // MARK: - Name Filters
-    
+
     /// Filter files where name contains the substring.
-    @discardableResult
     public func nameContains(_ substring: String) -> DriveListBuilder {
         let escaped = substring.replacingOccurrences(of: "'", with: "\\'")
-        queryParts.insert("name contains '\(escaped)'")
-        return self
+        return adding("name contains '\(escaped)'")
     }
-    
+
     /// Filter files where name equals exactly.
-    @discardableResult
     public func nameEquals(_ name: String) -> DriveListBuilder {
         let escaped = name.replacingOccurrences(of: "'", with: "\\'")
-        queryParts.insert("name = '\(escaped)'")
-        return self
+        return adding("name = '\(escaped)'")
     }
-    
+
     // MARK: - State Filters
-    
+
     /// Exclude trashed files.
-    @discardableResult
     public func notTrashed() -> DriveListBuilder {
-        queryParts.insert("trashed = false")
-        return self
+        adding("trashed = false")
     }
-    
+
     /// Include only trashed files.
-    @discardableResult
     public func trashed() -> DriveListBuilder {
-        queryParts.insert("trashed = true")
-        return self
+        adding("trashed = true")
     }
-    
+
     /// Filter files owned by the authenticated user.
-    @discardableResult
     public func ownedByMe() -> DriveListBuilder {
-        queryParts.insert("'me' in owners")
-        return self
+        adding("'me' in owners")
     }
-    
+
     /// Filter files shared with the authenticated user.
-    @discardableResult
     public func sharedWithMe() -> DriveListBuilder {
-        queryParts.insert("sharedWithMe = true")
-        return self
+        adding("sharedWithMe = true")
     }
-    
+
     /// Filter files starred by the authenticated user.
-    @discardableResult
     public func starred() -> DriveListBuilder {
-        queryParts.insert("starred = true")
-        return self
+        adding("starred = true")
     }
-    
+
     // MARK: - Parent Folder
-    
+
     /// Filter files in a specific folder.
-    @discardableResult
     public func inFolder(_ folderId: String) -> DriveListBuilder {
-        queryParts.insert("'\(folderId)' in parents")
-        return self
+        adding("'\(folderId)' in parents")
     }
-    
+
     // MARK: - Custom
-    
+
     /// Add a raw custom query string.
     /// ```swift
     /// .custom("appProperties has { key = 'val' }")
     /// ```
-    @discardableResult
     public func custom(_ query: String) -> DriveListBuilder {
-        queryParts.insert(query)
-        return self
+        adding(query)
     }
-    
+
     // MARK: - Execute
-    
+
     /// Build the query string from accumulated parts.
     private func buildQuery() -> String? {
         guard !queryParts.isEmpty else { return nil }
         // Sort for deterministic output
         return queryParts.sorted().joined(separator: " and ")
     }
-    
+
     /// Execute the query and return matching files.
     public func execute() async throws(SheetsError) -> [DriveFile] {
         try await driveClient.list(query: buildQuery())
     }
-    
+
     /// Return the first matching file.
     /// Note: This fetches all matching files and returns the first one.
     /// There is no server-side limit optimization.
