@@ -98,13 +98,13 @@ final class SpreadsheetValuesTests: XCTestCase, @unchecked Sendable {
              ]
          )
          mockSession.queue(data: try! JSONEncoder().encode(metadata))
-        
+
         let spreadsheet = try await client.spreadsheet(id: TestConstants.spreadsheetID)
-        
+
         let valueRange = ValueRange(range: "A1", values: [["Test"]])
         mockSession.queue(data: try JSONEncoder().encode(valueRange))
-        
-        let val = try await spreadsheet.cell(sheet: "Sheet1", row: 1, column: 1)
+
+        let val = try await spreadsheet.cell(#Range("Sheet1!A1"))
         XCTAssertEqual(val, "Test")
     }
     

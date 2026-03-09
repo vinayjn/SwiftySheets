@@ -20,7 +20,7 @@ public struct Spreadsheet: Sendable {
         self.id = id
         metadata = try await Self.fetchMetadata(id: id, client: client)
     }
-    
+
     init(client: Client, metadata: Metadata) {
         self.client = client
         self.id = metadata.spreadsheetId
@@ -59,7 +59,7 @@ public extension Spreadsheet {
         metadata = try await Self.fetchMetadata(id: id, client: client)
     }
 
-    func sheets(afterRefreshingMetadata _: Bool = false) -> [Sheet] {
+    func sheets() -> [Sheet] {
         metadata.sheets
     }
 
@@ -69,7 +69,7 @@ public extension Spreadsheet {
         }
         return sheet
     }
-    
+
     @discardableResult
     func updateValues(
         range: SheetRange,
@@ -83,7 +83,7 @@ public extension Spreadsheet {
             valueInputOption: valueInputOption
         )
     }
-    
+
     @discardableResult
     func appendValues(
         range: SheetRange,
@@ -97,26 +97,26 @@ public extension Spreadsheet {
             valueInputOption: valueInputOption
         )
     }
-    
+
     // MARK: - Batch Update
-    
+
     @discardableResult
     internal func batchUpdate(requests: [BatchUpdateRequest.Request]) async throws(SheetsError) -> BatchUpdateResponse {
         return try await client.batchUpdate(spreadsheetId: id, requests: requests)
     }
-    
+
     @discardableResult
     func batchUpdate(@BatchUpdateBuilder _ builder: @Sendable () -> [BatchUpdateRequest.Request]) async throws(SheetsError) -> BatchUpdateResponse {
         try await batchUpdate(requests: builder())
     }
-    
+
     func addSheet(title: String, rowCount: Int = 1000, columnCount: Int = 26) async throws(SheetsError) {
         let request = AddSheet(title, gridProperties: Sheet.GridProperties(rowCount: rowCount, columnCount: columnCount))
         try await batchUpdate(requests: [request.request])
     }
-    
+
     // MARK: - Generic Codable Helpers
-    
+
     func values<T: SheetRowDecodable>(
         range: SheetRange,
         type: T.Type,
@@ -129,12 +129,20 @@ public extension Spreadsheet {
             dateTimeRenderOption: dateTimeRenderOption
         )
         do {
-            return try rawValues.map { try T(row: $0) }
+            return try rawValues.enumerated().map { index, row in
+                do {
+                    return try T(row: row)
+                } catch {
+                    throw SheetsError.decodingError(context: "Failed to decode \(T.self) at row \(index): \(error)")
+                }
+            }
+        } catch let error as SheetsError {
+            throw error
         } catch {
-            throw .invalidResponse(status: 0)
+            throw .decodingError(context: "Failed to decode \(T.self): \(error)")
         }
     }
-    
+
     @discardableResult
     func updateValues<T: SheetRowEncodable>(
         range: SheetRange,
@@ -153,7 +161,7 @@ public extension Spreadsheet {
             valueInputOption: valueInputOption
         )
     }
-    
+
     @discardableResult
     func appendValues<T: SheetRowEncodable>(
         range: SheetRange,
@@ -173,9 +181,9 @@ public extension Spreadsheet {
         )
     }
 
-    
+
     // MARK: - Query DSL
-    
+
     /// Create a fluent query for typed rows with filtering and sorting.
     /// ```swift
     /// let employees = try await spreadsheet.query(Employee.self, in: #Range("A:D"))
@@ -198,15 +206,15 @@ public extension Spreadsheet {
             dateTimeRenderOption: dateTimeRenderOption
         )
     }
-    
+
     // MARK: - Advanced Operations
-    
+
     internal func format(range: SheetRange, format: CellFormat) async throws(SheetsError) {
         let sheet = try resolveSheet(for: range)
         let request = FormatCells(sheet: sheet, range: range, format: format)
         try await batchUpdate(requests: [request.request])
     }
-    
+
     /// Create a fluent format builder for the specified range.
     /// ```swift
     /// try await spreadsheet.format(#Range("A1:D1"))
@@ -217,49 +225,29 @@ public extension Spreadsheet {
     func format(_ range: SheetRange) -> FormatBuilder {
         FormatBuilder(spreadsheet: self, range: range)
     }
-    
-    
+
+
     func sort(range: SheetRange, column: Int, ascending: Bool = true) async throws(SheetsError) {
         let sheet = try resolveSheet(for: range)
         let request = SortRange(sheet: sheet, range: range, column: column, ascending: ascending)
         try await batchUpdate(requests: [request.request])
     }
-    
+
     @discardableResult
     func clearValues(range: SheetRange) async throws(SheetsError) -> ClearValuesResponse {
         try await client.clearValues(spreadsheetId: id, range: range.description)
     }
-    
+
     // MARK: - Developer Experience
-    
+
     func cell(_ range: SheetRange) async throws(SheetsError) -> String? {
         let values = try await self.values(range: range)
         return values.first?.first
     }
-    
-    func cell(row: Int, column: Int) async throws(SheetsError) -> String? {
-        let colStr = SheetRange.indexToColumn(column - 1)
-        guard let col = try? SheetColumn(colStr as String),
-              let rowIdx = try? SheetRowIndex(row as Int) else {
-            throw .invalidRange(message: "Invalid row/column: \(row), \(column)")
-        }
-        let r = SheetRange.root().from(col: col, row: rowIdx)
-        return try await cell(r)
-    }
-    
-    func cell(sheet: String, row: Int, column: Int) async throws(SheetsError) -> String? {
-        let colStr = SheetRange.indexToColumn(column - 1)
-        guard let col = try? SheetColumn(colStr as String),
-              let rowIdx = try? SheetRowIndex(row as Int) else {
-            throw .invalidRange(message: "Invalid row/column: \(row), \(column)")
-        }
-        let r = SheetRange.root(sheet).from(col: col, row: rowIdx)
-        return try await cell(r)
-    }
 
     func resize(sheetId: Int, rows: Int, columns: Int) async throws(SheetsError) {
         let request = ResizeSheet(
-            sheet: Sheet(properties: Sheet.SheetProperties(sheetId: sheetId, title: "", index: 0, gridProperties: Sheet.GridProperties(rowCount: 0, columnCount: 0))),
+            sheetId: sheetId,
             rows: rows,
             columns: columns
         )
@@ -283,7 +271,7 @@ public extension Spreadsheet {
 /// Provides convenient subscript access to cells.
 /// For type-safe operations, use the explicit method APIs.
 public extension Spreadsheet {
-    
+
     /// Access cells with a validated SheetRange: `spreadsheet[#Range("A1:B10")]`
     /// Or use the new Column DSL: `spreadsheet[Column.A[1]...Column.B[10]]`
     subscript(_ range: SheetRange) -> RangeAccessor {
@@ -295,34 +283,34 @@ public extension Spreadsheet {
 public struct RangeAccessor: Sendable {
     private let spreadsheet: Spreadsheet
     private let range: SheetRange
-    
+
     init(spreadsheet: Spreadsheet, range: SheetRange) {
         self.spreadsheet = spreadsheet
         self.range = range
     }
-    
+
     /// Get all values in the range
     public func get() async throws(SheetsError) -> [[String]] {
         try await spreadsheet.values(range: range)
     }
-    
+
     /// Set values in the range
     public func set(_ values: [[String]]) async throws(SheetsError) {
         try await spreadsheet.updateValues(range: range, values: values)
     }
-    
+
     /// Clear the range
     public func clear() async throws(SheetsError) {
         try await spreadsheet.clearValues(range: range)
     }
-    
+
     // MARK: - Single Value Helpers
-    
+
     /// Get the first cell value in the range
     public func stringValue() async throws(SheetsError) -> String? {
         try await spreadsheet.cell(range)
     }
-    
+
     /// Set a single value (top-left cell of range)
     public func set(_ value: String) async throws(SheetsError) {
         try await spreadsheet.updateValues(range: range, values: [[value]])

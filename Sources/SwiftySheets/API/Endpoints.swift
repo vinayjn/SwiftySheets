@@ -4,8 +4,6 @@ import FoundationNetworking
 #endif
 
 enum Endpoint {
-    private static let baseURL = "https://sheets.googleapis.com/v4/spreadsheets"
-
     case spreadsheet(id: String)
     case create
     case values(
