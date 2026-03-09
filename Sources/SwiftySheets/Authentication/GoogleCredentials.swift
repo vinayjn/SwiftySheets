@@ -66,19 +66,19 @@ public struct ServiceAccountCredentials: GoogleCredentials, @unchecked Sendable 
 
 /// Credentials using a direct OAuth 2.0 access token.
 /// Useful for mobile/desktop apps where the user signs in via a native flow (e.g. GoogleSignIn).
-public struct OAuthCredentials: GoogleCredentials, @unchecked Sendable {
-    private let tokenProvider: () async -> String?
-    
+public struct OAuthCredentials: GoogleCredentials, Sendable {
+    private let tokenProvider: @Sendable () async -> String?
+
     /// Initialize with a static access token.
     /// - Parameter accessToken: The OAuth 2.0 access token.
     public init(accessToken: String) {
         self.tokenProvider = { accessToken }
     }
-    
+
     /// Initialize with an async token provider.
     /// Useful if you need to fetch or refresh the token dynamically.
     /// - Parameter tokenProvider: A closure that returns an optional access token.
-    public init(tokenProvider: @escaping () async -> String?) {
+    public init(tokenProvider: @escaping @Sendable () async -> String?) {
         self.tokenProvider = tokenProvider
     }
     
