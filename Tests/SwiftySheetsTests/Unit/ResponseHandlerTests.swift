@@ -131,4 +131,84 @@ final class ResponseHandlerTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
     }
+
+    // MARK: - SafeString Null Handling
+
+    func testValueRangeDecodesNullCells() throws {
+        // JSON with null values mixed in — Google Sheets can return these
+        let json = """
+        {"range": "A1:B2", "values": [["hello", null, "world"], [null, "test"]]}
+        """
+        let data = Data(json.utf8)
+        let valueRange = try JSONDecoder().decode(ValueRange.self, from: data)
+
+        XCTAssertEqual(valueRange.values.count, 2)
+        XCTAssertEqual(valueRange.values[0], ["hello", "", "world"])
+        XCTAssertEqual(valueRange.values[1], ["", "test"])
+    }
+
+    func testValueRangeDecodesNumericCells() throws {
+        let json = """
+        {"range": "A1:C1", "values": [[42, 3.14, true]]}
+        """
+        let data = Data(json.utf8)
+        let valueRange = try JSONDecoder().decode(ValueRange.self, from: data)
+
+        XCTAssertEqual(valueRange.values[0][0], "42")
+        XCTAssertEqual(valueRange.values[0][1], "3.14")
+        XCTAssertEqual(valueRange.values[0][2], "true")
+    }
+
+    func testValueRangeDecodesEmptyValues() throws {
+        let json = """
+        {"range": "A1:A1", "values": []}
+        """
+        let data = Data(json.utf8)
+        let valueRange = try JSONDecoder().decode(ValueRange.self, from: data)
+        XCTAssertEqual(valueRange.values.count, 0)
+    }
+
+    // MARK: - SheetsError Descriptions
+
+    func testSheetsErrorLocalizedDescriptions() {
+        let cases: [(SheetsError, String)] = [
+            (.authenticationFailed, "Authentication failed"),
+            (.invalidRequest, "request could not be constructed"),
+            (.networkError("timeout"), "timeout"),
+            (.spreadsheetNotFound(message: "bad id"), "bad id"),
+            (.sheetNotFound(message: "Sheet2"), "Sheet2"),
+            (.invalidRange(message: "bad col"), "bad col"),
+            (.decodingError(context: "row 5"), "row 5"),
+            (.invalidResponse(status: 502), "502"),
+            (.permissionDenied(message: "no access"), "no access"),
+            (.rateLimitExceeded(retryAfter: 30), "30"),
+            (.rateLimitExceeded(retryAfter: nil), "Rate limit exceeded"),
+            (.quotaExceeded(retryAfter: 60), "60"),
+            (.quotaExceeded(retryAfter: nil), "Quota exceeded"),
+            (.invalidCredentials(message: "bad json"), "bad json"),
+        ]
+
+        for (error, substring) in cases {
+            let description = error.localizedDescription
+            XCTAssertTrue(
+                description.contains(substring),
+                "\(error) description '\(description)' should contain '\(substring)'"
+            )
+        }
+    }
+
+    func testSheetsErrorApiErrorDescription() throws {
+        let apiError = GoogleAPIError(
+            error: GoogleAPIError.ErrorDetails(
+                code: 500,
+                message: "Internal error",
+                status: "INTERNAL",
+                details: nil
+            )
+        )
+        let error = SheetsError.apiError(apiError)
+        let description = error.localizedDescription
+        XCTAssertTrue(description.contains("500"))
+        XCTAssertTrue(description.contains("Internal error"))
+    }
 }
