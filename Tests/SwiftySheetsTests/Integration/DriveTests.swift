@@ -24,7 +24,7 @@ final class DriveTests: XCTestCase, @unchecked Sendable {
         
         mockSession.mockData = try JSONEncoder().encode(fileList)
         
-        let files = try await client.drive.list()
+        let files = try await client.drive.list(query: nil)
         XCTAssertEqual(files.count, 2)
         XCTAssertEqual(files[0].name, "File 1")
     }
