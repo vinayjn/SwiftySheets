@@ -241,6 +241,8 @@ do throws(SheetsError) {
         // Google API specific error
     case .invalidRange(let message):
         // Bad range format
+    case .decodingError(let context):
+        // Row decoding failed — includes row index and type name
     }
 }
 ```
