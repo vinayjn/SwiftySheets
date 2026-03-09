@@ -4,7 +4,7 @@ import SwiftSyntaxBuilder
 import SwiftDiagnostics
 
 public struct SheetRowMacro: MemberMacro, ExtensionMacro {
-    
+
     public static func expansion(
         of node: AttributeSyntax,
         attachedTo declaration: some DeclGroupSyntax,
@@ -13,18 +13,18 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
         in context: some MacroExpansionContext
     ) throws -> [ExtensionDeclSyntax] {
         // Generate extension with conformances
-        
+
         let decl: ExtensionDeclSyntax = try ExtensionDeclSyntax("extension \(type.trimmed): SheetRowCodable, Equatable, Hashable {}")
         return [decl]
     }
-    
+
     struct PropInfo {
         let name: String
         let type: String
         let columnIndex: Int
         let dateFormat: String?
     }
-    
+
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf declaration: some DeclGroupSyntax,
@@ -35,27 +35,27 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
             context.diagnose(Diagnostic(node: node, message: SimpleDiagnosticMessage(message: "@SheetRow can only be applied to structs", diagnosticID: MessageID(domain: "SwiftySheets", id: "InvalidType"), severity: .error)))
             return []
         }
-        
+
         let members = structDecl.memberBlock.members
         let storedProperties = members.compactMap { $0.decl.as(VariableDeclSyntax.self) }
-        
+
         var props: [PropInfo] = []
-        
+
         for property in storedProperties {
             guard let binding = property.bindings.first,
                   let name = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text,
                   let type = binding.typeAnnotation?.type.description else {
                 continue
             }
-            
+
             // Check for @Column attribute
             var columnIndex: Int = 0
             var dateFormat: String? = nil
-            
+
             if let attribute = property.attributes.first(where: {
                 $0.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == "Column"
             }), let args = attribute.as(AttributeSyntax.self)?.arguments?.as(LabeledExprListSyntax.self) {
-                 
+
 
                 for arg in args {
                     if let label = arg.label?.text {
@@ -88,7 +88,47 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
             }
             props.append(PropInfo(name: name, type: type, columnIndex: columnIndex, dateFormat: dateFormat))
         }
-        
+
+        // Collect unique date formats that need static formatters
+        var dateFormats: Set<String> = []
+        var needsISO8601 = false
+        for p in props {
+            let type = p.type.trimmingCharacters(in: .whitespaces)
+            let cleanType = type.hasSuffix("?") ? String(type.dropLast()) : type
+            if cleanType == "Date" {
+                if let format = p.dateFormat {
+                    dateFormats.insert(format)
+                } else {
+                    needsISO8601 = true
+                }
+            }
+        }
+
+        // Generate static formatter declarations
+        var staticFormatters = ""
+        if needsISO8601 {
+            staticFormatters += "private static let _iso8601Formatter = ISO8601DateFormatter()\n"
+        }
+        for (i, format) in dateFormats.sorted().enumerated() {
+            staticFormatters += """
+            private static let _dateFormatter\(i): DateFormatter = {
+                let f = DateFormatter()
+                f.dateFormat = "\(format)"
+                return f
+            }()
+
+            """
+        }
+        let sortedFormats = dateFormats.sorted()
+
+        // Helper to get the formatter variable name for a given format
+        func formatterName(for format: String?) -> String {
+            if let format = format, let idx = sortedFormats.firstIndex(of: format) {
+                return "Self._dateFormatter\(idx)"
+            }
+            return "Self._iso8601Formatter"
+        }
+
         // 1. Generate init(row: [String])
         var initBody = ""
         for p in props {
@@ -96,10 +136,10 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
             let type = p.type.trimmingCharacters(in: .whitespaces)
             let isOptional = type.hasSuffix("?")
             let cleanType = isOptional ? String(type.dropLast()) : type
-            
+
             let safeRead = "row.count > \(col) ? row[\(col)] : \"\""
             let rawVar = "raw_\(p.name)"
-            
+
 
             var conversion = ""
             if cleanType == "String" {
@@ -128,26 +168,12 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
                     conversion = "self.\(p.name) = \(boolParse)"
                 }
             } else if cleanType == "Date" {
-                 // Date Handling
-                var parser = ""
-                if let format = p.dateFormat {
-                    parser = """
-                    {
-                        let f = DateFormatter()
-                        f.dateFormat = "\(format)"
-                        return f.date(from: \(safeRead))
-                    }()
-                    """
-                } else {
-                    // ISO8601 Default
-                    parser = "ISO8601DateFormatter().date(from: \(safeRead))"
-                }
-                
+                let fmt = formatterName(for: p.dateFormat)
+                let parser = "\(fmt).date(from: \(safeRead))"
+
                 if isOptional {
-                    // Note: invalid date parse -> nil. Empty string -> nil.
                     conversion = "let \(rawVar) = \(safeRead); self.\(p.name) = \(rawVar).isEmpty ? nil : \(parser)"
                 } else {
-                    // Default to Date()
                     conversion = "self.\(p.name) = \(parser) ?? Date()"
                 }
             } else {
@@ -157,29 +183,29 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
                     conversion = "// Unsupported type \(cleanType)"
                  }
             }
-            
+
             initBody += "\n    // \(p.name): \(type)\n    \(conversion)"
         }
-        
+
         let initDecl = """
         public init(row: [String]) throws {
             \(initBody)
         }
         """
-        
+
         // 2. Generate encodeRow() -> [String]
         var maxIndex = 0
         for p in props { if p.columnIndex > maxIndex { maxIndex = p.columnIndex } }
-        
+
         var usageStmts = ""
         for p in props {
             let col = p.columnIndex
             let type = p.type.trimmingCharacters(in: .whitespaces)
             let isOptional = type.hasSuffix("?")
             let cleanType = isOptional ? String(type.dropLast()) : type
-            
+
             var encodeExpr = ""
-            
+
             if cleanType == "String" {
                 if isOptional {
                     encodeExpr = "self.\(p.name) ?? \"\""
@@ -199,32 +225,20 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
                     encodeExpr = "(self.\(p.name) ? \"TRUE\" : \"FALSE\")"
                 }
             } else if cleanType == "Date" {
-                 // Date encoding
-                var formatter = ""
-                if let format = p.dateFormat {
-                    formatter = """
-                    {
-                        let f = DateFormatter()
-                        f.dateFormat = "\(format)"
-                        return f.string(from: val)
-                    }()
-                    """
-                } else {
-                    formatter = "ISO8601DateFormatter().string(from: val)"
-                }
-                
+                let fmt = formatterName(for: p.dateFormat)
+
                 if isOptional {
-                    encodeExpr = "self.\(p.name).map { val in \(formatter) } ?? \"\""
+                    encodeExpr = "self.\(p.name).map { \(fmt).string(from: $0) } ?? \"\""
                 } else {
-                    encodeExpr = "{ let val = self.\(p.name); return \(formatter) }()"
+                    encodeExpr = "\(fmt).string(from: self.\(p.name))"
                 }
             } else {
                 encodeExpr = "\"\""
             }
-            
+
             usageStmts += "if values.count > \(col) { values[\(col)] = \(encodeExpr) }\n"
         }
-        
+
         let encodeDecl = """
         public func encodeRow() throws -> [String] {
             var values = Array(repeating: "", count: \(maxIndex + 1))
@@ -236,21 +250,32 @@ public struct SheetRowMacro: MemberMacro, ExtensionMacro {
         // 3. Generate memberwise init
         var memberwiseParams: [String] = []
         var memberwiseAssigns: [String] = []
-        
+
         for p in props {
             memberwiseParams.append("\(p.name): \(p.type)")
             memberwiseAssigns.append("self.\(p.name) = \(p.name)")
         }
-        
+
         let memberwiseInit = """
         public init(\(memberwiseParams.joined(separator: ", "))) {
             \(memberwiseAssigns.joined(separator: "\n    "))
         }
         """
-        
-        return [DeclSyntax(stringLiteral: initDecl), DeclSyntax(stringLiteral: encodeDecl), DeclSyntax(stringLiteral: memberwiseInit)]
+
+        var results: [DeclSyntax] = []
+
+        // Add static formatters first if needed
+        if !staticFormatters.isEmpty {
+            results.append(DeclSyntax(stringLiteral: staticFormatters))
+        }
+
+        results.append(DeclSyntax(stringLiteral: initDecl))
+        results.append(DeclSyntax(stringLiteral: encodeDecl))
+        results.append(DeclSyntax(stringLiteral: memberwiseInit))
+
+        return results
     }
-    
+
     private static func columnLetterToIndex(_ letter: String) throws -> Int {
         guard !letter.isEmpty else {
              throw MacroError(message: "Column name cannot be empty")

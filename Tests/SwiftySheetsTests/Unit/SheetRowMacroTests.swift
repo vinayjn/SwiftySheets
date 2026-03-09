@@ -69,10 +69,10 @@ final class SheetRowMacroTests: XCTestCase {
             struct Test {
                 var col: String
             }
-            
+
             extension Test: SheetRowCodable, Equatable, Hashable {
                 public init(row: [String]) throws {
-            
+
                     // col: String
                     self.col = row.count > 0 ? row[0] : ""
                 }
@@ -83,6 +83,82 @@ final class SheetRowMacroTests: XCTestCase {
                 }
                 public init(col: String) {
                     self.col = col
+                }
+            }
+            """,
+            macros: testMacros
+        )
+        #endif
+    }
+
+    func testMacroDateUsesStaticFormatter() {
+        #if canImport(SwiftySheetsMacros)
+        assertMacroExpansion(
+            """
+            @SheetRow
+            struct Record {
+                @Column("A") var createdAt: Date
+            }
+            """,
+            expandedSource: """
+            struct Record {
+                var createdAt: Date
+            }
+
+            extension Record: SheetRowCodable, Equatable, Hashable {
+                private static let _iso8601Formatter = ISO8601DateFormatter()
+                public init(row: [String]) throws {
+
+                    // createdAt: Date
+                    self.createdAt = Self._iso8601Formatter.date(from: row.count > 0 ? row[0] : "") ?? Date()
+                }
+                public func encodeRow() throws -> [String] {
+                    var values = Array(repeating: "", count: 1)
+                    if values.count > 0 { values[0] = Self._iso8601Formatter.string(from: self.createdAt) }
+                    return values
+                }
+                public init(createdAt: Date) {
+                    self.createdAt = createdAt
+                }
+            }
+            """,
+            macros: testMacros
+        )
+        #endif
+    }
+
+    func testMacroCustomDateFormatUsesStaticFormatter() {
+        #if canImport(SwiftySheetsMacros)
+        assertMacroExpansion(
+            """
+            @SheetRow
+            struct Record {
+                @Column("A", format: "yyyy-MM-dd") var date: Date
+            }
+            """,
+            expandedSource: """
+            struct Record {
+                var date: Date
+            }
+
+            extension Record: SheetRowCodable, Equatable, Hashable {
+                private static let _dateFormatter0: DateFormatter = {
+                    let f = DateFormatter()
+                    f.dateFormat = "yyyy-MM-dd"
+                    return f
+                }()
+                public init(row: [String]) throws {
+
+                    // date: Date
+                    self.date = Self._dateFormatter0.date(from: row.count > 0 ? row[0] : "") ?? Date()
+                }
+                public func encodeRow() throws -> [String] {
+                    var values = Array(repeating: "", count: 1)
+                    if values.count > 0 { values[0] = Self._dateFormatter0.string(from: self.date) }
+                    return values
+                }
+                public init(date: Date) {
+                    self.date = date
                 }
             }
             """,
